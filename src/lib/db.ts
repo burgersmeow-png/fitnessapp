@@ -154,6 +154,7 @@ interface ExerciseRow {
   primary_muscles: string;
   secondary_muscles: string;
   compound: number;
+  custom: number;
 }
 
 export async function loadExercises(db: SQLiteDatabase): Promise<Exercise[]> {
@@ -165,7 +166,23 @@ export async function loadExercises(db: SQLiteDatabase): Promise<Exercise[]> {
     primary: JSON.parse(r.primary_muscles),
     secondary: JSON.parse(r.secondary_muscles),
     compound: r.compound === 1,
+    ...(r.custom ? { custom: true } : {}),
   }));
+}
+
+export async function saveCustomExercise(db: SQLiteDatabase, e: Exercise): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO exercises (id, name, equipment, primary_muscles, secondary_muscles, compound, custom) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+    e.id, e.name, e.equipment, JSON.stringify(e.primary), JSON.stringify(e.secondary), e.compound ? 1 : 0,
+  );
+}
+
+/** Removes a custom exercise if it was never logged. Returns false when sets still use it. */
+export async function deleteCustomExercise(db: SQLiteDatabase, id: string): Promise<boolean> {
+  const used = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM sets WHERE exercise_id = ?', id);
+  if (used?.n) return false;
+  await db.runAsync('DELETE FROM exercises WHERE id = ? AND custom = 1', id);
+  return true;
 }
 
 export async function loadSettings(db: SQLiteDatabase): Promise<Settings> {

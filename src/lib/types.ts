@@ -28,6 +28,8 @@ export interface Exercise {
   secondary: Muscle[];
   equipment: Equipment;
   compound: boolean;
+  /** Added by the lifter rather than built in. */
+  custom?: boolean;
 }
 
 /** One logged set. `rir` is reps in reserve (0 = failure). */

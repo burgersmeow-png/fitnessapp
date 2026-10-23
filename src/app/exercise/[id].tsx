@@ -1,10 +1,12 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BodyMap, type MuscleFills } from '../../components/BodyMap';
 import { ExerciseDemo } from '../../components/ExerciseDemo';
-import { Card, SectionLabel, Loading } from '../../components/ui';
-import { loadExercises, loadHistory, loadSettings } from '../../lib/db';
+import { Button, Card, SectionLabel, Loading } from '../../components/ui';
+import { confirm } from '../../components/confirm';
+import { deleteCustomExercise, loadExercises, loadHistory, loadSettings } from '../../lib/db';
 import { formatDate, MUSCLE_LABELS } from '../../lib/format';
 import { EXERCISE_GUIDE } from '../../lib/exerciseGuide';
 import { estimate1RM } from '../../lib/progression';
@@ -16,6 +18,7 @@ import { loadNotes, saveNote } from '../../services/notes';
 export default function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
+  const [blocked, setBlocked] = useState(false);
   const [data, reload] = useFocusData(async () => {
     const [exercises, history, settings, notes] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), loadNotes(db)]);
     const sets = history.filter((s) => s.exerciseId === id);
@@ -117,6 +120,26 @@ export default function ExerciseScreen() {
           </Text>
         </View>
       ))}
+      {exercise.custom && (
+        <>
+          <Button
+            title="Delete exercise"
+            variant="danger"
+            style={{ marginTop: space.lg }}
+            onPress={() =>
+              confirm('Delete this exercise?', 'It comes out of your list and future plans.', 'Delete', async () => {
+                if (await deleteCustomExercise(db, exercise.id)) router.back();
+                else setBlocked(true);
+              }, true)
+            }
+          />
+          {blocked && (
+            <Text style={{ color: colors.textMuted, marginTop: space.sm }}>
+              You’ve logged sets of this lift, so it stays to keep your history whole.
+            </Text>
+          )}
+        </>
+      )}
     </ScrollView>
   );
 }
