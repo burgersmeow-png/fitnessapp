@@ -207,6 +207,7 @@ Code layout:
 - `src/lib/notes.ts` personal notes per lift (`src/components/LiftNote.tsx`, `src/services/notes.ts`)
 - `src/lib/exportCsv.ts` training log as CSV (Settings, "Export training log"; `src/services/exportLog.ts`)
 - `src/lib/customExercise.ts` your own exercises (`src/app/exercise-new.tsx`)
+- `src/lib/superset.ts` supersets: alternate two lifts, rest after the second
 - `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
 - `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
 - `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting

@@ -15,7 +15,9 @@ import {
   loadExercises,
   loadHistory,
   loadSettings,
+  loadRecord,
   loadWorkoutSets,
+  saveRecord,
   saveSettings,
   swapSets,
   updateSet,
@@ -25,6 +27,7 @@ import { formatClock, formatNumber, MUSCLE_LABELS } from '../lib/format';
 import { adjustNextSet, estimate1RM, personalRecords, suggestWeight } from '../lib/progression';
 import { swapOptions } from '../lib/swap';
 import { groupSets } from '../lib/repeat';
+import { link, partnerOf, restAfterSet, supersetNext, unlink, type Pair } from '../lib/superset';
 import { colors, radius, space, TAP, type } from '../lib/theme';
 import type { Exercise, LoggedSet, Settings } from '../lib/types';
 import { cancelRestAlert, scheduleRestAlert } from '../services/restAlert';
@@ -85,6 +88,7 @@ export default function WorkoutScreen() {
   const [coachReply, setCoachReply] = useState<string | null>(null);
   const [history, setHistory] = useState<LoggedSet[]>([]);
   const [notes, setNotes] = useState<LiftNotes>({});
+  const [pairs, setPairs] = useState<Pair[]>([]);
   // The exercise group being swapped, by its first set's id.
   const [swapping, setSwapping] = useState<number | null>(null);
 
@@ -106,6 +110,7 @@ export default function WorkoutScreen() {
       setHistory(prior);
       setExercises(new Map(list.map((e) => [e.id, e])));
       setSettings(s);
+      setPairs((await loadRecord<Pair[]>(db, `superset:${id}`)) ?? []);
       setWorkoutId(id);
       setSets(workoutSets);
     })();
@@ -154,6 +159,11 @@ export default function WorkoutScreen() {
     await reload(workoutId);
   };
 
+  const savePairs = (next: Pair[]) => {
+    setPairs(next);
+    if (workoutId != null) saveRecord(db, `superset:${workoutId}`, next.length ? next : null);
+  };
+
   const edit = (id: number, field: 'weight' | 'reps' | 'rir', value: number | null) => {
     setSets((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
     updateSet(db, id, { [field]: value });
@@ -179,14 +189,17 @@ export default function WorkoutScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       setRestNote(await autoAdjust(set));
-      startRest(set.restSeconds, set);
+      const rest = restAfterSet(set, sets, pairs);
+      if (rest > 0) startRest(rest, set);
+      else skipRest(); // Superset: straight on to the partner lift.
     }
     await reload(workoutId!);
   };
 
   /** Name of the exercise the lifter does next, for the rest alert. */
   const nextUpAfter = (set: WorkoutSet) => {
-    const next = sets.find((s) => s.id !== set.id && !s.completedAt && s.position > set.position)
+    const next = supersetNext(set, sets, pairs)
+      ?? sets.find((s) => s.id !== set.id && !s.completedAt && s.position > set.position)
       ?? sets.find((s) => s.id !== set.id && !s.completedAt);
     return next ? exercises.get(next.exerciseId)?.name ?? 'next set' : 'wrap up and finish';
   };
@@ -203,7 +216,7 @@ export default function WorkoutScreen() {
   const startRest = (seconds: number, set: WorkoutSet) => {
     setRestEndsAt(Date.now() + seconds * 1000);
     setNow(Date.now());
-    const following = sets.find((s) => s.id !== set.id && !s.completedAt && s.position > set.position);
+    const following = supersetNext(set, sets, pairs) ?? sets.find((s) => s.id !== set.id && !s.completedAt && s.position > set.position);
     restOverLine.current = following ? `Rest over. ${describe(following)}.` : 'Rest over. That was the last set. Nice work.';
     nextUp.current = nextUpAfter(set);
     scheduleRestAlert(seconds, nextUp.current);
@@ -317,6 +330,7 @@ export default function WorkoutScreen() {
       const finished = sets.filter((s) => s.completedAt);
       const prNames = [...new Set(finished.filter((s) => prSets.has(s.id)).map((s) => exercises.get(s.exerciseId)?.name ?? ''))];
       await finishWorkout(db, workoutId!);
+      saveRecord(db, `superset:${workoutId}`, null);
       if (finished.length > 0) finishAssignedWorkout(db, workoutId!).catch(() => {});
       if (finished.length > 0) await finishProgramWorkout(db, workoutId!);
       skipRest();
@@ -478,82 +492,108 @@ export default function WorkoutScreen() {
           const firstHeavy =
             groups.findIndex((x) => exercises.get(x.exerciseId)?.compound && x.sets.every((s) => !s.completedAt)) === gi;
           const left = g.sets.filter((s) => !s.completedAt).length;
+          const after = groups[gi + 1];
+          const paired = partnerOf(g.exerciseId, pairs);
+          const linkedToNext = !!after && paired?.first === true && paired.partner === after.exerciseId;
+          const canLink =
+            !!after && !paired && !partnerOf(after.exerciseId, pairs) && left > 0 && after.sets.some((s) => !s.completedAt);
           return (
-            <Card key={`${g.exerciseId}-${g.sets[0].id}`} style={{ marginBottom: space.md }}>
-              <View style={styles.exHeader}>
-                <Pressable
-                  onPress={() => router.push(`/exercise/${g.exerciseId}`)}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
-                  accessibilityRole="button"
-                  accessibilityHint="Shows how to do it"
-                >
-                  {e && <ExerciseThumb exercise={e} size={52} />}
-                  <View style={{ flex: 1, marginLeft: space.md }}>
-                    <Text style={[type.title, { fontSize: 19 }]}>{e?.name}</Text>
-                    <Text style={styles.meta}>{e?.primary.map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
-                  </View>
-                </Pressable>
-                {left === 0 ? (
-                  <Text style={styles.doneBadge}>✓</Text>
-                ) : (
+            <View key={`${g.exerciseId}-${g.sets[0].id}`}>
+              <Card style={[{ marginBottom: linkedToNext || canLink ? 0 : space.md }, paired && styles.supersetCard]}>
+                <View style={styles.exHeader}>
                   <Pressable
-                    onPress={() => setSwapping(g.sets[0].id)}
-                    style={styles.swapButton}
-                    hitSlop={8}
+                    onPress={() => router.push(`/exercise/${g.exerciseId}`)}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
                     accessibilityRole="button"
-                    accessibilityLabel={`Swap ${e?.name ?? 'exercise'}`}
+                    accessibilityHint="Shows how to do it"
                   >
-                    <Icon name="swap" size={20} color={colors.textMuted} />
+                    {e && <ExerciseThumb exercise={e} size={52} />}
+                    <View style={{ flex: 1, marginLeft: space.md }}>
+                      <Text style={[type.title, { fontSize: 19 }]}>{e?.name}</Text>
+                      <Text style={styles.meta}>{e?.primary.map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
+                    </View>
                   </Pressable>
+                  {left === 0 ? (
+                    <Text style={styles.doneBadge}>✓</Text>
+                  ) : (
+                    <Pressable
+                      onPress={() => setSwapping(g.sets[0].id)}
+                      style={styles.swapButton}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Swap ${e?.name ?? 'exercise'}`}
+                    >
+                      <Icon name="swap" size={20} color={colors.textMuted} />
+                    </Pressable>
+                  )}
+                </View>
+                <Text style={[styles.meta, { marginBottom: space.sm }]}>
+                  {left > 0 ? `${left} to go` : 'All sets done'} · target {g.sets[0].targetReps} reps, {g.sets[0].targetRir} in reserve
+                </Text>
+                {e && left > 0 && (
+                  <LiftTools
+                    exercise={e}
+                    units={settings?.units ?? 'lb'}
+                    working={g.sets[0].weight}
+                    next={(g.sets.find((s) => !s.completedAt) ?? g.sets[g.sets.length - 1]).weight}
+                    warmupFirst={firstHeavy}
+                  />
                 )}
-              </View>
-              <Text style={[styles.meta, { marginBottom: space.sm }]}>
-                {left > 0 ? `${left} to go` : 'All sets done'} · target {g.sets[0].targetReps} reps, {g.sets[0].targetRir} in reserve
-              </Text>
-              {e && left > 0 && (
-                <LiftTools
-                  exercise={e}
-                  units={settings?.units ?? 'lb'}
-                  working={g.sets[0].weight}
-                  next={(g.sets.find((s) => !s.completedAt) ?? g.sets[g.sets.length - 1]).weight}
-                  warmupFirst={firstHeavy}
-                />
-              )}
-              {left > 0 && (
-                <LiftNote note={notes[g.exerciseId]} onSave={async (text) => setNotes(await saveNote(db, g.exerciseId, text))} />
-              )}
-              <View style={styles.columns}>
-                <Text style={[styles.colLabel, { width: 28 }]}>SET</Text>
-                <Pressable onPress={toggleUnits} style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel="Switch between kilograms and pounds">
-                  <Text style={[styles.colLabel, { color: colors.accent }]}>{settings?.units.toUpperCase()} ⇄</Text>
+                {left > 0 && (
+                  <LiftNote note={notes[g.exerciseId]} onSave={async (text) => setNotes(await saveNote(db, g.exerciseId, text))} />
+                )}
+                <View style={styles.columns}>
+                  <Text style={[styles.colLabel, { width: 28 }]}>SET</Text>
+                  <Pressable onPress={toggleUnits} style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel="Switch between kilograms and pounds">
+                    <Text style={[styles.colLabel, { color: colors.accent }]}>{settings?.units.toUpperCase()} ⇄</Text>
+                  </Pressable>
+                  <Text style={[styles.colLabel, { flex: 1 }]}>REPS</Text>
+                  <Text style={[styles.colLabel, { width: 52 }]}>RIR</Text>
+                  <View style={{ width: TAP }} />
+                </View>
+                {g.sets.map((s, i) => (
+                  <SetRow
+                    key={s.id}
+                    index={i + 1}
+                    set={s}
+                    units={settings?.units ?? 'lb'}
+                    pr={prSets.has(s.id)}
+                    onEdit={edit}
+                    onToggle={() => toggle(s)}
+                    onCopyPrevious={i > 0 ? () => copyPrevious(s, g.sets[i - 1]) : undefined}
+                  />
+                ))}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add a set of ${e?.name ?? 'this exercise'}`}
+                  onPress={async () => {
+                    await addSet(db, workoutId!, g.sets.at(-1)!);
+                    await reload(workoutId!);
+                  }}
+                >
+                  <Text style={styles.addSet}>+ Add set</Text>
                 </Pressable>
-                <Text style={[styles.colLabel, { flex: 1 }]}>REPS</Text>
-                <Text style={[styles.colLabel, { width: 52 }]}>RIR</Text>
-                <View style={{ width: TAP }} />
-              </View>
-              {g.sets.map((s, i) => (
-                <SetRow
-                  key={s.id}
-                  index={i + 1}
-                  set={s}
-                  units={settings?.units ?? 'lb'}
-                  pr={prSets.has(s.id)}
-                  onEdit={edit}
-                  onToggle={() => toggle(s)}
-                  onCopyPrevious={i > 0 ? () => copyPrevious(s, g.sets[i - 1]) : undefined}
-                />
-              ))}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Add a set of ${e?.name ?? 'this exercise'}`}
-                onPress={async () => {
-                  await addSet(db, workoutId!, g.sets.at(-1)!);
-                  await reload(workoutId!);
-                }}
-              >
-                <Text style={styles.addSet}>+ Add set</Text>
-              </Pressable>
-            </Card>
+              </Card>
+              {linkedToNext ? (
+                <View style={styles.supersetLink}>
+                  <View style={styles.supersetLine} />
+                  <Text style={styles.supersetLabel}>SUPERSET · no rest between</Text>
+                  <Pressable onPress={() => savePairs(unlink(pairs, g.exerciseId))} hitSlop={10} accessibilityRole="button" accessibilityLabel="Unlink superset">
+                    <Text style={styles.supersetAction}>Unlink</Text>
+                  </Pressable>
+                </View>
+              ) : canLink ? (
+                <Pressable
+                  onPress={() => savePairs(link(pairs, g.exerciseId, after.exerciseId))}
+                  style={styles.supersetLink}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Superset with ${exercises.get(after.exerciseId)?.name ?? 'the next lift'}`}
+                >
+                  <Text style={styles.supersetAction}>+ Superset with next</Text>
+                </Pressable>
+              ) : null}
+            </View>
           );
         })}
       </ScrollView>
@@ -736,6 +776,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },
+  supersetCard: { borderLeftWidth: 3, borderLeftColor: colors.accent },
+  supersetLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, minHeight: 40 },
+  supersetLine: { position: 'absolute', left: space.lg, top: 0, bottom: 0, width: 3, backgroundColor: colors.accent },
+  supersetLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
+  supersetAction: { color: colors.accent, fontSize: 14, fontWeight: '700' },
   swapButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
   doneBadge: { color: colors.success, fontSize: 22, fontWeight: '800' },
   columns: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.xs },
