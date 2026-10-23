@@ -10,6 +10,18 @@ const PROJECT_ID: string | undefined = Constants.expoConfig?.extra?.eas?.project
 /** This phone can receive coach alerts. */
 export const pushSupported = Platform.OS !== 'web' && socialConfigured && !!SERVER_URL && !!PROJECT_ID;
 
+/** Phones can get alerts from Expo's push service (no account needed for this part). */
+export const expoPushSupported = Platform.OS !== 'web' && !!SERVER_URL && !!PROJECT_ID;
+
+/** This phone's Expo push token, asking for permission first when `ask` is set. null if not allowed. */
+export async function expoPushToken({ ask }: { ask: boolean }): Promise<string | null> {
+  if (!expoPushSupported) return null;
+  let { granted, canAskAgain } = await Notifications.getPermissionsAsync();
+  if (!granted && ask && canAskAgain) granted = (await Notifications.requestPermissionsAsync()).granted;
+  if (!granted) return null;
+  return (await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID })).data;
+}
+
 let registered: string | null = null;
 
 /**
@@ -19,11 +31,8 @@ let registered: string | null = null;
 export async function registerPush({ ask }: { ask: boolean }): Promise<void> {
   if (!pushSupported) return;
   try {
-    let { granted, canAskAgain } = await Notifications.getPermissionsAsync();
-    if (!granted && ask && canAskAgain) granted = (await Notifications.requestPermissionsAsync()).granted;
-    if (!granted) return;
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
-    if (token === registered) return;
+    const token = await expoPushToken({ ask });
+    if (!token || token === registered) return;
     const { error } = await supabase.rpc('claim_push_token', { t: token });
     if (!error) registered = token;
   } catch {

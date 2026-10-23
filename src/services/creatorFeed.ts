@@ -1,7 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { cleanPins, feedStale, markSeen, mergeFeed, type CreatorFeed, type Pin } from '../lib/creatorFeed';
 import { loadRecord, saveRecord } from '../lib/db';
-import { loadCreator } from './creatorCode';
+import { flushCreator, installId, loadCreator } from './creatorCode';
+import { expoPushSupported, expoPushToken } from './push';
 import { SERVER_URL } from './server';
 
 const KEY = 'creator-feed';
@@ -32,4 +33,31 @@ export async function loadFeed(db: SQLiteDatabase, now = new Date()): Promise<Cr
 export async function markPinSeen(db: SQLiteDatabase, pin: Pin): Promise<void> {
   const feed = await loadRecord<CreatorFeed>(db, KEY);
   if (feed) await saveRecord(db, KEY, markSeen(feed, pin));
+}
+
+const ALERTS = 'creator-alerts';
+
+export const creatorAlertsSupported = expoPushSupported;
+export const creatorAlertsOn = async (db: SQLiteDatabase) => (await loadRecord<boolean>(db, ALERTS)) === true;
+
+/**
+ * Asks for notification permission and signs this phone up for its creator's alerts. Returns a
+ * line to show when it didn't work.
+ */
+export async function turnOnCreatorAlerts(db: SQLiteDatabase): Promise<string | null> {
+  try {
+    const token = await expoPushToken({ ask: true });
+    if (!token) return 'Notifications are off for LiftLab. Turn them on in Settings, then try again.';
+    await flushCreator(db);
+    const res = await fetch(`${SERVER_URL}/ref/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ installId: await installId(db), token }),
+    });
+    if (!res.ok) return 'Couldn’t turn alerts on. Try again later.';
+    await saveRecord(db, ALERTS, true);
+    return null;
+  } catch {
+    return 'No connection. Try again when you’re online.';
+  }
 }

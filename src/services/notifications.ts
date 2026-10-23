@@ -8,7 +8,8 @@ import { Platform } from 'react-native';
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async (n) => {
-      const fromCoach = n.request.content.data?.kind === 'coach';
+      // Coach alerts and creator posts show even with the app open.
+      const fromCoach = n.request.content.data?.kind === 'coach' || n.request.content.data?.kind === 'creator';
       return { shouldShowBanner: fromCoach, shouldShowList: fromCoach, shouldPlaySound: fromCoach, shouldSetBadge: false };
     },
   });

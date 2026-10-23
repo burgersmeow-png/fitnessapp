@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { isNew, KIND_LABEL, pinRoute, type Pin } from '../lib/creatorFeed';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
-import { loadFeed, markPinSeen } from '../services/creatorFeed';
+import { creatorAlertsOn, creatorAlertsSupported, loadFeed, markPinSeen, turnOnCreatorAlerts } from '../services/creatorFeed';
 import { Icon } from './Icon';
 
 const SHOWN = 3;
@@ -13,8 +13,10 @@ const SHOWN = 3;
 /** Today's "From Alex" card: what the follower's creator has pinned, newest marked. */
 export function CreatorFeedCard() {
   const db = useSQLiteContext();
-  const [feed] = useFocusData(() => loadFeed(db), []);
+  const [data, reload] = useFocusData(async () => ({ feed: await loadFeed(db), alerts: await creatorAlertsOn(db) }), []);
   const [all, setAll] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const feed = data?.feed;
   if (!feed) return null;
 
   const open = (pin: Pin) => {
@@ -46,6 +48,20 @@ export function CreatorFeedCard() {
           <Text style={styles.more}>Show {feed.pins.length - SHOWN} more</Text>
         </Pressable>
       )}
+      {creatorAlertsSupported && !data?.alerts && (
+        <Pressable
+          onPress={async () => {
+            setNote(await turnOnCreatorAlerts(db));
+            reload();
+          }}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.alerts, pressed && { opacity: 0.8 }]}
+        >
+          <Icon name="bell" size={18} color={colors.accent} />
+          <Text style={styles.alertsText}>Tell me when {feed.name} posts</Text>
+        </Pressable>
+      )}
+      {note && <Text style={styles.note}>{note}</Text>}
     </View>
   );
 }
@@ -58,5 +74,8 @@ const styles = StyleSheet.create({
   kind: { color: colors.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },
   title: { color: colors.text, fontSize: 17, fontWeight: '700', marginTop: 2 },
   new: { color: colors.accentText, backgroundColor: colors.accent, fontSize: 11, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
+  alerts: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm, minHeight: 44 },
+  alertsText: { color: colors.accent, fontSize: 15, fontWeight: '700' },
+  note: { color: colors.textMuted, fontSize: 14, marginTop: space.xs },
   more: { color: colors.accent, fontSize: 15, fontWeight: '700' },
 });

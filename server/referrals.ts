@@ -2,7 +2,7 @@
 // it active after their first workout. No sign-in needed, since most people never make an account.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readJson, send } from './http';
-import { dailyCounts, dailyOpens, parseClaim, parsePinsRequest, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
+import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePinsRequest, parsePushRequest, pinAlert, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
 import { admin, databaseConfigured } from './supabase';
 import type { Pin } from './referralRules';
 
@@ -16,6 +16,33 @@ const ipOf = (req: IncomingMessage) => (req.headers['x-forwarded-for'] as string
 async function lookup(code: string) {
   const { data } = await admin().from('creator_codes').select('code, creator_name, welcome, pins').eq('code', code).eq('active', true).maybeSingle();
   return data as { code: string; creator_name: string; welcome: string | null; pins: Pin[] } | null;
+}
+
+const EXPO_PUSH = process.env.EXPO_PUSH_URL ?? 'https://exp.host/--/api/v2/push/send';
+
+/** Tells followers who opted in about new pins. Forgets phones that no longer exist. */
+async function alertFollowers(code: string, creatorName: string, pins: Pin[]): Promise<number> {
+  const { data } = await admin().from('referrals').select('push_token').eq('code', code).not('push_token', 'is', null);
+  const tokens = [...new Set((data ?? []).map((r: { push_token: string }) => r.push_token))];
+  const alert = pinAlert(creatorName, pins);
+  let sent = 0;
+  for (const batch of chunks(tokens)) {
+    const res = await fetch(EXPO_PUSH, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}),
+      },
+      body: JSON.stringify(batch.map((to) => ({ to, sound: 'default', ...alert }))),
+    });
+    if (!res.ok) continue;
+    const { data: results } = (await res.json()) as { data?: { details?: { error?: string } }[] };
+    const gone = batch.filter((_, i) => results?.[i]?.details?.error === 'DeviceNotRegistered');
+    if (gone.length) await admin().from('referrals').update({ push_token: null }).in('push_token', gone);
+    sent += batch.length - gone.length;
+  }
+  return sent;
 }
 
 /** Routes /ref/*. Returns false when the path isn't a referral route. */
@@ -39,6 +66,14 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
         const { error } = await admin().rpc('count_link_open', { p_code: code });
         if (error) throw error;
       }
+      return send(res, 200, { ok: true }), true;
+    }
+    if (req.method === 'POST' && url.pathname === '/ref/push') {
+      // A follower opted in to hear when their creator posts. Their install must already be credited.
+      const ask = parsePushRequest(await readJson(req, 512));
+      if (!ask) return send(res, 400, { error: 'Bad request' }), true;
+      const { error } = await admin().from('referrals').update({ push_token: ask.token }).eq('install_id', ask.installId);
+      if (error) throw error;
       return send(res, 200, { ok: true }), true;
     }
     if (req.method === 'POST' && url.pathname === '/ref/claim') {
@@ -91,12 +126,19 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       // The creator's public page: what shows when followers open their link.
       const ask = parsePinsRequest(await readJson(req, 64_000));
       if (!ask) return send(res, 400, { error: 'Pin up to 6 workout, plan or challenge links.' }), true;
-      const { data: c } = await admin().from('creator_codes').select('stats_token').eq('code', ask.code).maybeSingle();
+      const { data: c } = await admin().from('creator_codes').select('stats_token, creator_name, pins, last_alert_at').eq('code', ask.code).maybeSingle();
       if (!c || !tokensMatch(c.stats_token, ask.token)) return send(res, 403, { error: 'That dashboard link isn’t valid. Ask for a new one.' }), true;
       if (ask.bad.length) return send(res, 400, { error: `Line ${ask.bad.map((i) => i + 1).join(', ')} isn’t a LiftLab workout, plan or challenge link.` }), true;
-      const { error } = await admin().from('creator_codes').update({ pins: ask.pins }).eq('code', ask.code);
+      const fresh = newPins((c.pins ?? []) as Pin[], ask.pins);
+      const now = new Date();
+      const alerting = fresh.length > 0 && canAlert(c.last_alert_at, now);
+      const { error } = await admin()
+        .from('creator_codes')
+        .update({ pins: ask.pins, ...(alerting ? { last_alert_at: now.toISOString() } : {}) })
+        .eq('code', ask.code);
       if (error) throw error;
-      return send(res, 200, { pins: ask.pins }), true;
+      const notified = alerting ? await alertFollowers(ask.code, c.creator_name, fresh).catch((e) => (console.error('creator alert', e), 0)) : 0;
+      return send(res, 200, { pins: ask.pins, notified, alertedRecently: fresh.length > 0 && !alerting }), true;
     }
     return send(res, 404, { error: 'Not found' }), true;
   } catch (e) {

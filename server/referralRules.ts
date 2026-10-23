@@ -114,3 +114,39 @@ export function dailyOpens(rows: { day: string; opens: number }[], now: Date, da
   }
   return out;
 }
+
+const PUSH_TOKEN = /^Expo(nent)?PushToken\[.+\]$/;
+
+/** The app's "alert me when my creator posts" request. */
+export function parsePushRequest(body: unknown): { installId: string; token: string } | null {
+  const b = body as { installId?: unknown; token?: unknown } | null;
+  if (!validInstall(b?.installId) || typeof b?.token !== 'string' || b.token.length > 200 || !PUSH_TOKEN.test(b.token)) return null;
+  return { installId: b.installId as string, token: b.token };
+}
+
+/** Pins that weren't on the page before this save. */
+export const newPins = (before: Pin[], after: Pin[]) => after.filter((p) => !before.some((b) => b.payload === p.payload));
+
+export const ALERT_GAP_MS = 12 * 60 * 60 * 1000;
+export const canAlert = (lastAlertAt: string | null, now: Date) => !lastAlertAt || now.getTime() - Date.parse(lastAlertAt) >= ALERT_GAP_MS;
+
+const KIND_WORD = { w: 'workout', p: 'plan', c: 'challenge' } as const;
+const SCREEN = { w: ['/try', 'w'], p: ['/plan', 'p'], c: ['/challenge', 'c'] } as const;
+
+/** The alert followers get, opening the pin in the app when tapped. */
+export function pinAlert(creatorName: string, pins: Pin[]) {
+  const pin = pins[0];
+  const [path, param] = SCREEN[pin.kind];
+  return {
+    title: pins.length === 1 ? `${creatorName} posted a new ${KIND_WORD[pin.kind]}` : `${creatorName} posted ${pins.length} new things`,
+    body: pins.length === 1 ? pin.title : pins.map((p) => p.title).join(', '),
+    data: { kind: 'creator', path, params: { [param]: pin.payload } },
+  };
+}
+
+/** Expo takes at most 100 messages per request. */
+export function chunks<T>(list: T[], size = 100): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
