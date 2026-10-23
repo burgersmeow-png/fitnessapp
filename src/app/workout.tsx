@@ -24,6 +24,10 @@ import { adjustNextSet, estimate1RM, personalRecords } from '../lib/progression'
 import { colors, radius, space, TAP, type } from '../lib/theme';
 import type { Exercise, Settings } from '../lib/types';
 import { cancelRestAlert, scheduleRestAlert } from '../services/restAlert';
+import { say } from '../services/speech';
+import { EXAMPLES, parseCommand } from '../lib/voice';
+import { CoachBar } from '../components/CoachBar';
+import { Icon } from '../components/Icon';
 
 function close() {
   if (router.canGoBack()) router.back();
@@ -54,6 +58,11 @@ export default function WorkoutScreen() {
   const [restNote, setRestNote] = useState<string | null>(null);
   const startedAt = useRef(Date.now());
   const nextUp = useRef('next set');
+  // Once the lifter talks to the coach, the coach talks back, including when rest ends.
+  const voiceMode = useRef(false);
+  const restOverLine = useRef('');
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [coachReply, setCoachReply] = useState<string | null>(null);
 
   const reload = async (id: number) => setSets(await loadWorkoutSets(db, id));
 
@@ -89,6 +98,7 @@ export default function WorkoutScreen() {
       if (t >= restEndsAt) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setRestEndsAt(null);
+        if (voiceMode.current && restOverLine.current) say(restOverLine.current);
       }
     }, 250);
     return () => clearInterval(timer);
@@ -143,15 +153,26 @@ export default function WorkoutScreen() {
     return next ? exercises.get(next.exerciseId)?.name ?? 'next set' : 'wrap up and finish';
   };
 
+  /** "Set 2 of Bench Press, 8 reps at 100 pounds" for the coach to read out. */
+  const describe = (set: WorkoutSet) => {
+    const ofExercise = sets.filter((s) => s.exerciseId === set.exerciseId);
+    const n = ofExercise.findIndex((s) => s.id === set.id) + 1;
+    const name = exercises.get(set.exerciseId)?.name ?? 'the next exercise';
+    const load = set.weight != null ? ` at ${set.weight} ${settings?.units === 'kg' ? 'kilos' : 'pounds'}` : '';
+    return `Set ${n} of ${name}, ${set.reps ?? set.targetReps ?? ''} reps${load}`;
+  };
+
   const startRest = (seconds: number, set: WorkoutSet) => {
     setRestEndsAt(Date.now() + seconds * 1000);
     setNow(Date.now());
+    const following = sets.find((s) => s.id !== set.id && !s.completedAt && s.position > set.position);
+    restOverLine.current = following ? `Rest over. ${describe(following)}.` : 'Rest over. That was the last set. Nice work.';
     nextUp.current = nextUpAfter(set);
     scheduleRestAlert(seconds, nextUp.current);
   };
 
-  const extendRest = () => {
-    const endsAt = (restEndsAt ?? Date.now()) + 30000;
+  const extendRest = (seconds = 30) => {
+    const endsAt = (restEndsAt ?? Date.now()) + seconds * 1000;
     setRestEndsAt(endsAt);
     scheduleRestAlert((endsAt - Date.now()) / 1000, nextUp.current);
   };
@@ -159,6 +180,51 @@ export default function WorkoutScreen() {
   const skipRest = () => {
     setRestEndsAt(null);
     cancelRestAlert();
+  };
+
+  /** Runs one dictated command against the current set. */
+  const runCommand = async (text: string) => {
+    voiceMode.current = true;
+    const cmd = parseCommand(text);
+    const current = sets.find((s) => !s.completedAt);
+    let reply: string;
+    if (cmd.kind === 'log') {
+      if (!current) {
+        reply = 'All sets are done. Say finish workout when you are ready.';
+      } else {
+        // A weight said in the other unit is converted to the one on screen.
+        const units = settings?.units ?? 'lb';
+        let weight = cmd.weight ?? current.weight;
+        if (cmd.weight != null && cmd.unit && cmd.unit !== units) {
+          const kg = cmd.unit === 'kg' ? cmd.weight : cmd.weight / 2.20462262;
+          weight = Math.round((units === 'kg' ? kg : kg * 2.20462262) * 10) / 10;
+        }
+        const logged = { ...current, weight, reps: cmd.reps ?? current.reps ?? current.targetReps, rir: cmd.rir ?? current.rir ?? current.targetRir };
+        await updateSet(db, current.id, { weight: logged.weight, reps: logged.reps, rir: logged.rir });
+        setSets((prev) => prev.map((s) => (s.id === logged.id ? logged : s)));
+        await toggle(logged);
+        const following = sets.find((s) => s.id !== logged.id && !s.completedAt && s.position > logged.position);
+        reply = `Logged ${logged.reps} reps${logged.weight != null ? ` at ${logged.weight}` : ''}.${
+          following ? ` Rest ${Math.round(logged.restSeconds / 15) * 15} seconds.` : ' That was the last set.'
+        }`;
+      }
+    } else if (cmd.kind === 'skipRest') {
+      skipRest();
+      reply = current ? `Let's go. ${describe(current)}.` : 'All sets are done.';
+    } else if (cmd.kind === 'addRest') {
+      extendRest(cmd.seconds);
+      reply = `Added ${cmd.seconds >= 60 ? `${cmd.seconds / 60} minute${cmd.seconds > 60 ? 's' : ''}` : `${cmd.seconds} seconds`}.`;
+    } else if (cmd.kind === 'next') {
+      const left = sets.filter((s) => !s.completedAt).length;
+      reply = current ? `${describe(current)}. ${left} set${left === 1 ? '' : 's'} left.` : 'All sets are done.';
+    } else if (cmd.kind === 'finish') {
+      reply = 'Finishing your workout.';
+      finish();
+    } else {
+      reply = `Sorry, I didn't catch that. Try "${EXAMPLES.workout[0]}".`;
+    }
+    setCoachReply(reply);
+    say(reply);
   };
 
   /** Copies the previous set's weight and reps into this one: the most common edit. */
@@ -271,11 +337,25 @@ export default function WorkoutScreen() {
         <Pressable onPress={() => close()} hitSlop={12} accessibilityRole="button" accessibilityHint="Keeps the workout running">
           <Text style={styles.headerLink}>Minimize</Text>
         </Pressable>
-        <ProgressRing done={done} total={sets.length} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <ProgressRing done={done} total={sets.length} />
+          <Pressable
+            onPress={() => setCoachOpen((o) => !o)}
+            hitSlop={10}
+            style={[styles.coachButton, coachOpen && { backgroundColor: colors.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel="Talk to the coach"
+            accessibilityHint="Log sets and control rest by voice"
+          >
+            <Icon name="mic" size={18} color={coachOpen ? colors.accentText : colors.text} />
+          </Pressable>
+        </View>
         <Pressable onPress={finish} hitSlop={12} accessibilityRole="button" accessibilityLabel="Finish workout">
           <Text style={[styles.headerLink, { color: colors.accent, fontWeight: '700' }]}>Finish</Text>
         </Pressable>
       </View>
+
+      {coachOpen && <CoachBar reply={coachReply} examples={EXAMPLES.workout} placeholder="Say “8 reps at 100”" onSubmit={runCommand} />}
 
       <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 160 }} keyboardShouldPersistTaps="handled">
         {groups.map((g) => {
@@ -351,7 +431,7 @@ export default function WorkoutScreen() {
             )}
           </View>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Button title="+30s" variant="secondary" onPress={extendRest} />
+            <Button title="+30s" variant="secondary" onPress={() => extendRest()} />
             <Button title="Skip" onPress={skipRest} />
           </View>
         </View>
@@ -479,6 +559,14 @@ const styles = StyleSheet.create({
   },
   headerLink: { color: colors.textMuted, fontSize: 17 },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+  coachButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   exHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },
   doneBadge: { color: colors.success, fontSize: 22, fontWeight: '800' },
   columns: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.xs },

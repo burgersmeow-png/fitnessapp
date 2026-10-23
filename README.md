@@ -15,6 +15,10 @@ Working name; rename any time in `app.json`.
 - **Food**: snap a photo of a meal and get calories, protein, carbs and fat from AI, or search common
   foods and add your own. Daily targets come from your body weight and goal, with a calorie ring and
   macro bars, and today's intake shows on the Today screen
+- **Voice coach**: tap the mic on Today and say "30 minute upper body with dumbbells" or "quick leg day"
+  to get a matching workout. During a workout, tap the mic and say "8 reps at 100", "2 left in the tank",
+  "add 30 seconds" or "what's next". The coach answers out loud and tells you when rest is over.
+  Speech comes from the iPhone keyboard's dictation mic, and everything is understood on the phone
 - **Cardio**: log runs, rides, rowing, swims and intervals; they count toward muscle recovery
 - **History**: workouts and cardio, weekly streak, volume
 - **Exercises**: 66 exercises with body-map thumbnails, searchable and filtered by muscle, with a strength trend
@@ -85,6 +89,7 @@ Code layout:
 - `src/lib/figure.ts`, `src/lib/motions.ts` drawn, animated exercise demos (owned, no licence needed)
 - `src/lib/progression.ts` training max, overload, stall and deload logic, mid-workout adjustment, PRs
 - `src/lib/cardio.ts` cardio types and how they load each muscle
+- `src/lib/voice.ts` understands spoken coach commands (offline)
 - `src/lib/nutrition.ts` calorie and macro targets, totals, photo-estimate checks, common foods
 - `server/food-ai.ts` the photo estimate server (Claude), with its prompt in `src/lib/foodPrompt.ts`
 - `src/components/BodyMap.tsx` the front and back body illustration
@@ -95,5 +100,5 @@ Code layout:
 ## Next
 
 See the plan doc for the full roadmap: Apple Health and Watch, programs, barcode scanning,
-Strava and Garmin, voice-commanded workouts, social features and trainer mode. HealthKit and the Watch
+Strava and Garmin, always-on voice listening, social features and trainer mode. HealthKit and the Watch
 app need a development build through EAS and a paid Apple Developer account.

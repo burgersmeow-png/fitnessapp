@@ -106,6 +106,16 @@ export default function TodayScreen() {
           </Pressable>
           {activeId == null && (
             <Pressable
+              onPress={() => router.push('/coach')}
+              accessibilityRole="button"
+              accessibilityLabel="Ask the coach for a workout"
+              style={({ pressed }) => [styles.heroIconButton, pressed && { opacity: 0.7 }]}
+            >
+              <Icon name="mic" size={22} color="#FFFFFF" />
+            </Pressable>
+          )}
+          {activeId == null && (
+            <Pressable
               onPress={() => setSeed((s) => s + 1)}
               accessibilityRole="button"
               accessibilityLabel="Generate a different workout"

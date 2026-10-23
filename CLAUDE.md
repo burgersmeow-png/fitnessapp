@@ -18,6 +18,9 @@ Read `AGENTS.md` too (Expo-specific rules: versioned docs, `npx expo install`, E
 - Exercise demos are drawn in code, not filmed: `src/lib/figure.ts` (geometry) and `src/lib/motions.ts`
   (two key poses per exercise). Coaching cues live in `src/lib/exerciseGuide.ts`. Do not add
   third-party exercise photos or videos without a licence that allows commercial app use.
+- Voice: `src/lib/voice.ts` parses dictated text offline (no AI call); `src/services/speech.ts` speaks
+  replies. Speech-to-text is the iPhone keyboard's dictation mic for now; always-on listening needs a
+  native speech module and a development build.
 - One feature per screen file; extract a component when a screen passes ~300 lines.
 - No new dependencies unless the owner approves. Prefer Expo modules that run in Expo Go.
 

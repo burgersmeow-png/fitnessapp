@@ -6,6 +6,7 @@ import { EXERCISE_GUIDE } from './exerciseGuide';
 import { blend, joints, repProgress } from './figure';
 import { exerciseCount, generateWorkout, muscleRecovery } from './generator';
 import { MOTIONS } from './motions';
+import { normalizeSpeech, parseCommand } from './voice';
 import { dailyTargets, mealForTime, normalizeEstimate, scaleItem } from './nutrition';
 import { adjustNextSet, estimate1RM, liftStatus, personalRecords, suggestNext, suggestWeight, trainingMax } from './progression';
 import { DEFAULT_SETTINGS, type LoggedSet } from './types';
@@ -195,4 +196,54 @@ test('a checked estimate passes through a second check unchanged', () => {
     note: '',
   });
   assert.deepEqual(normalizeEstimate(once), once);
+});
+
+test('spoken numbers become digits', () => {
+  assert.equal(normalizeSpeech('Eight reps at one hundred and thirty five'), '8 reps at 135');
+  assert.equal(normalizeSpeech('twenty-five kilos'), '25 kilos');
+  assert.equal(normalizeSpeech('1,000 calories!'), '1000 calories');
+});
+
+test('voice: asking for a workout', () => {
+  const a = parseCommand('Give me a 30 minute upper body workout with dumbbells');
+  assert.equal(a.kind, 'workout');
+  if (a.kind !== 'workout') return;
+  assert.equal(a.minutes, 30);
+  assert.deepEqual(a.focus, ['chest', 'back', 'shoulders', 'biceps', 'triceps']);
+  assert.deepEqual(a.equipment, ['dumbbell', 'bodyweight']);
+
+  const legs = parseCommand('quick leg day');
+  assert.ok(legs.kind === 'workout' && legs.minutes === 20 && legs.focus.includes('quads'));
+
+  const home = parseCommand('Full body, no equipment, half an hour');
+  assert.ok(home.kind === 'workout' && home.minutes === 30 && home.equipment?.includes('bodyweight') && !home.equipment.includes('barbell'));
+
+  const heavy = parseCommand('heavy push session');
+  assert.ok(heavy.kind === 'workout' && heavy.goal === 'strength' && heavy.focus.includes('triceps'));
+
+  const back = parseCommand('lets hit upper back');
+  assert.ok(back.kind === 'workout' && back.label === 'back');
+});
+
+test('voice: logging a set', () => {
+  assert.deepEqual(parseCommand('8 reps at 100'), { kind: 'log', reps: 8, weight: 100, rir: null, unit: null });
+  assert.deepEqual(parseCommand('one hundred kilos for eight'), { kind: 'log', reps: 8, weight: 100, rir: null, unit: 'kg' });
+  assert.deepEqual(parseCommand('Done, two left in the tank'), { kind: 'log', reps: null, weight: null, rir: 2, unit: null });
+  assert.deepEqual(parseCommand('10 reps'), { kind: 'log', reps: 10, weight: null, rir: null, unit: null });
+  assert.deepEqual(parseCommand('12 reps 60 pounds to failure'), { kind: 'log', reps: 12, weight: 60, rir: 0, unit: 'lb' });
+});
+
+test('voice: rest and navigation', () => {
+  assert.deepEqual(parseCommand('skip rest'), { kind: 'skipRest' });
+  assert.deepEqual(parseCommand('add 30 seconds'), { kind: 'addRest', seconds: 30 });
+  assert.deepEqual(parseCommand('give me another minute of rest'), { kind: 'addRest', seconds: 60 });
+  assert.deepEqual(parseCommand("What's next?"), { kind: 'next' });
+  assert.deepEqual(parseCommand('finish workout'), { kind: 'finish' });
+  assert.deepEqual(parseCommand('banana'), { kind: 'unknown' });
+});
+
+test('a requested focus overrides recovery', () => {
+  const w = generateWorkout(EXERCISES, [], { ...DEFAULT_SETTINGS, equipment: ['dumbbell', 'bodyweight'] }, now, [], ['biceps', 'triceps']);
+  assert.deepEqual([...new Set(w.focus)].sort(), ['biceps', 'triceps']);
+  assert.ok(w.exercises.every((p) => ['dumbbell', 'bodyweight'].includes(EXERCISES_BY_ID.get(p.exerciseId)!.equipment)));
 });

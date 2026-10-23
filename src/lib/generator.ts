@@ -101,6 +101,8 @@ export function generateWorkout(
   settings: Settings,
   now: Date = new Date(),
   extraFatigue: FatigueEvent[] = [],
+  /** Muscles to train regardless of recovery, e.g. from a spoken request. */
+  focusOverride: Muscle[] = [],
 ): GeneratedWorkout {
   const byId = new Map(exercises.map((e) => [e.id, e]));
   const recovery = muscleRecovery(history, byId, now, extraFatigue);
@@ -117,8 +119,10 @@ export function generateWorkout(
     .sort((a, b) => recovery[b] - recovery[a] || size[b] - size[a]);
 
   // Only train muscles that are at least 60% recovered, but always plan something.
+  // A requested focus wins, freshest of those muscles first.
   const ready = ranked.filter((m) => recovery[m] >= 0.6);
-  const pool = ready.length >= 2 ? ready : ranked;
+  const requested = ranked.filter((m) => focusOverride.includes(m));
+  const pool = requested.length > 0 ? requested : ready.length >= 2 ? ready : ranked;
 
   const chosen: Exercise[] = [];
   const focus: Muscle[] = [];

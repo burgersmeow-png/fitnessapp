@@ -31,11 +31,13 @@ const ICONS = {
   elliptical: { sf: 'figure.elliptical', ion: 'sync' },
   intervals: { sf: 'bolt.heart.fill', ion: 'flash' },
   food: { sf: 'fork.knife', ion: 'restaurant' },
+  mic: { sf: 'mic.fill', ion: 'mic' },
   camera: { sf: 'camera.fill', ion: 'camera' },
   photos: { sf: 'photo.on.rectangle', ion: 'images' },
   search: { sf: 'magnifyingglass', ion: 'search' },
   trash: { sf: 'trash', ion: 'trash-outline' },
   sparkles: { sf: 'sparkles', ion: 'sparkles' },
+  close: { sf: 'xmark', ion: 'close' },
 } as const satisfies Record<string, { sf: SFSymbol; ion: keyof typeof Ionicons.glyphMap }>;
 
 export type IconName = keyof typeof ICONS;
