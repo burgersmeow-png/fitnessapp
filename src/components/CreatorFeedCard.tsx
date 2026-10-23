@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { isNew, KIND_LABEL, pinRoute, type Pin } from '../lib/creatorFeed';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
+import { loadCreator } from '../services/creatorCode';
 import { creatorAlertsOn, creatorAlertsSupported, loadFeed, markPinSeen, turnOnCreatorAlerts } from '../services/creatorFeed';
 import { Icon } from './Icon';
 
@@ -13,7 +14,7 @@ const SHOWN = 3;
 /** Today's "From Alex" card: what the follower's creator has pinned, newest marked. */
 export function CreatorFeedCard() {
   const db = useSQLiteContext();
-  const [data, reload] = useFocusData(async () => ({ feed: await loadFeed(db), alerts: await creatorAlertsOn(db) }), []);
+  const [data, reload] = useFocusData(async () => ({ feed: await loadFeed(db), alerts: await creatorAlertsOn(db), code: (await loadCreator(db))?.code }), []);
   const [all, setAll] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const feed = data?.feed;
@@ -21,7 +22,9 @@ export function CreatorFeedCard() {
 
   const open = (pin: Pin) => {
     markPinSeen(db, pin).catch(() => {});
-    router.push(pinRoute(pin));
+    const to = pinRoute(pin);
+    // With the code on it, the screen names the creator ("ALEX’S WORKOUT").
+    router.push({ ...to, params: { ...to.params, ...(data?.code ? { code: data.code } : {}) } });
   };
 
   return (
