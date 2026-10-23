@@ -16,6 +16,13 @@ export interface LinkedLift {
 export interface WorkoutLink {
   title: string;
   lifts: LinkedLift[];
+  /** "Beat my workout": the sender's total volume, for the receiver to top. */
+  beat?: BeatTarget;
+}
+
+export interface BeatTarget {
+  volume: number;
+  units: 'lb' | 'kg';
 }
 
 export const LINK_VERSION = 1;
@@ -58,7 +65,8 @@ const clamp = (n: unknown, lo: number, hi: number) => (typeof n === 'number' && 
 const cleanText = (s: unknown, max: number) => (typeof s === 'string' ? s.replace(/[\u0000-\u001f]/g, '').trim().slice(0, max) : '');
 
 export function encodeWorkoutLink(w: WorkoutLink): string {
-  return toBase64Url(JSON.stringify([LINK_VERSION, ...packWorkout(w)]));
+  const beat = w.beat && cleanBeat([w.beat.volume, w.beat.units]);
+  return toBase64Url(JSON.stringify([LINK_VERSION, ...packWorkout(w), ...(beat ? [[beat.volume, beat.units]] : [])]));
 }
 
 /** null for anything that isn't a well-formed link. Numbers are clamped to sane ranges. */
@@ -73,7 +81,16 @@ export function decodeWorkoutLink(payload: string | null | undefined): WorkoutLi
     return null;
   }
   if (!Array.isArray(raw) || raw[0] !== LINK_VERSION) return null;
-  return cleanWorkout(raw[1], raw[2]);
+  const w = cleanWorkout(raw[1], raw[2]);
+  const beat = cleanBeat(raw[3]);
+  return w && beat ? { ...w, beat } : w;
+}
+
+/** A volume to beat from link data: [volume, 'lb' | 'kg'], or null. */
+export function cleanBeat(raw: unknown): BeatTarget | null {
+  if (!Array.isArray(raw) || (raw[1] !== 'lb' && raw[1] !== 'kg')) return null;
+  const volume = clamp(raw[0], 1, 10_000_000);
+  return volume == null ? null : { volume, units: raw[1] };
 }
 
 /** A workout's title and lifts from parsed link data, or null if anything is off. Numbers are clamped. */

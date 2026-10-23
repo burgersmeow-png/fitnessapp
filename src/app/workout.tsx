@@ -40,6 +40,8 @@ import { WorkoutLinkSheet } from '../components/WorkoutLinkSheet';
 import { linkFromSets, type WorkoutLink } from '../lib/workoutLink';
 import { challengeCardContent, type ChallengeProgress, type JoinedChallenge } from '../lib/challenge';
 import { freshWin } from '../services/challenge';
+import { beatCardContent, beatLine, beatResult, type BeatResult } from '../lib/beat';
+import { takeDare } from '../services/beat';
 import { syncChallengeEntry } from '../services/challengeBoard';
 import { cardContent, type CardContent } from '../lib/shareCard';
 import type { WorkoutForStrava } from '../lib/strava';
@@ -76,6 +78,7 @@ interface Summary {
   badges: Badge[];
   link: WorkoutLink;
   won: { challenge: JoinedChallenge; progress: ChallengeProgress } | null;
+  dare: { title: string; who: string | null; result: BeatResult } | null;
 }
 
 export default function WorkoutScreen() {
@@ -375,6 +378,9 @@ export default function WorkoutScreen() {
       const goal = settings?.weeklyGoal ?? 3;
       const [badges, dates] = await Promise.all([checkBadges(db, goal), loadSessionDates(db)]);
       const won = await freshWin(db, dates).catch(() => null);
+      const units = settings?.units ?? 'lb';
+      const volume = finished.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0);
+      const dare = await takeDare(db, workoutId!).catch(() => null);
       syncChallengeEntry(db).catch(() => {});
       // Celebrated here, so Today doesn't repeat them.
       if (badges.fresh.length) markBadgesSeen(db);
@@ -385,13 +391,17 @@ export default function WorkoutScreen() {
       const strength = (s: (typeof finished)[number]) => (s.weight && s.reps ? estimate1RM(s.weight, s.reps) : s.reps ?? 0);
       setSummary({
         sets: finished.length,
-        volume: finished.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0),
+        volume,
         minutes,
         prs: prNames,
         week: weekProgress(dates, goal),
         badges: badges.fresh,
         won,
-        link: linkFromSets('', finished, (id) => exercises.get(id)?.name ?? id),
+        dare: dare ? { title: dare.title, who: dare.who, result: beatResult(dare.target, volume, units) } : null,
+        link: {
+          ...linkFromSets(dare?.title ?? '', finished, (id) => exercises.get(id)?.name ?? id),
+          ...(volume > 0 ? { beat: { volume: Math.round(volume), units } } : {}),
+        },
         strava: {
           startedAt: new Date(startedAt.current).toISOString(),
           minutes,
@@ -504,6 +514,27 @@ export default function WorkoutScreen() {
               <Text style={styles.goalTitle}>{summary.won.challenge.title}</Text>
             </View>
             <Icon name="share" size={20} color={colors.accent} />
+          </Pressable>
+        )}
+        {summary.dare && (
+          <Pressable
+            onPress={() => {
+              setCardTitle('Share your win');
+              setCard(beatCardContent(summary.dare!.title, summary.dare!.result, settings?.units ?? 'lb', summary.dare!.who));
+            }}
+            disabled={!summary.dare.result.beaten}
+            style={styles.badgeRow}
+            accessibilityRole={summary.dare.result.beaten ? 'button' : 'text'}
+            accessibilityLabel={`${summary.dare.result.beaten ? 'Workout beaten' : 'Not beaten yet'}: ${beatLine(summary.dare.result, settings?.units ?? 'lb', summary.dare.who)}${summary.dare.result.beaten ? ' Share it' : ''}`}
+          >
+            <View style={styles.badgeIcon}>
+              <Icon name={summary.dare.result.beaten ? 'trophy' : 'flame'} size={22} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1, marginLeft: space.md }}>
+              <Text style={styles.badgeEyebrow}>{summary.dare.result.beaten ? (summary.dare.who ? `YOU BEAT ${summary.dare.who.toUpperCase()}` : 'WORKOUT BEATEN') : 'SO CLOSE'}</Text>
+              <Text style={styles.goalMeta}>{beatLine(summary.dare.result, settings?.units ?? 'lb', summary.dare.who)}</Text>
+            </View>
+            {summary.dare.result.beaten && <Icon name="share" size={20} color={colors.accent} />}
           </Pressable>
         )}
         {summary.badges.length > 2 && (
