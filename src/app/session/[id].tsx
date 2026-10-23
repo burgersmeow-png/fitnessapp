@@ -101,9 +101,9 @@ export default function SessionScreen() {
           : 'You have a workout going. Finish it, then you can do this one again.'}
       </Text>
       <View style={styles.shareRow}>
-        <Button title="Share to your story" variant="secondary" onPress={share} style={{ flex: 1 }} />
+        <Button title="Share story" variant="secondary" onPress={share} style={{ flex: 1 }} />
         <Button
-          title="Share as a link"
+          title="Share link"
           variant="secondary"
           onPress={() => setLink(linkFromSets('', sets, (eid) => exercises.get(eid)?.name ?? eid))}
           style={{ flex: 1 }}

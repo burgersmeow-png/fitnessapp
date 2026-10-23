@@ -36,6 +36,8 @@ import { EXAMPLES, parseCommand } from '../lib/voice';
 import { CoachBar } from '../components/CoachBar';
 import { StravaShare } from '../components/StravaShare';
 import { ShareCardSheet } from '../components/ShareCardSheet';
+import { WorkoutLinkSheet } from '../components/WorkoutLinkSheet';
+import { linkFromSets, type WorkoutLink } from '../lib/workoutLink';
 import { cardContent, type CardContent } from '../lib/shareCard';
 import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
@@ -68,6 +70,7 @@ interface Summary {
   strava: WorkoutForStrava;
   week: WeekProgress;
   badges: Badge[];
+  link: WorkoutLink;
 }
 
 export default function WorkoutScreen() {
@@ -97,6 +100,7 @@ export default function WorkoutScreen() {
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [restTimes, setRestTimes] = useState<RestTimes>({});
   const [card, setCard] = useState<CardContent | null>(null);
+  const [shareLink, setShareLink] = useState<WorkoutLink | null>(null);
   // The exercise group being swapped, by its first set's id.
   const [swapping, setSwapping] = useState<number | null>(null);
 
@@ -377,6 +381,7 @@ export default function WorkoutScreen() {
         prs: prNames,
         week: weekProgress(dates, goal),
         badges: badges.fresh,
+        link: linkFromSets('', finished, (id) => exercises.get(id)?.name ?? id),
         strava: {
           startedAt: new Date(startedAt.current).toISOString(),
           minutes,
@@ -474,16 +479,20 @@ export default function WorkoutScreen() {
         {summary.badges.length > 2 && (
           <Text style={[styles.goalMeta, { marginTop: space.sm }]}>{`+${summary.badges.length - 2} more in Badges`}</Text>
         )}
-        <Button
-          title="Share to your story"
-          variant="secondary"
-          onPress={() =>
-            setCard(cardContent({ ...summary.strava, sets: summary.sets, volume: summary.volume, streak: summary.week.streak }))
-          }
-          style={{ marginTop: space.lg }}
-        />
+        <View style={styles.shareRow}>
+          <Button
+            title="Share story"
+            variant="secondary"
+            onPress={() =>
+              setCard(cardContent({ ...summary.strava, sets: summary.sets, volume: summary.volume, streak: summary.week.streak }))
+            }
+            style={{ flex: 1 }}
+          />
+          <Button title="Share link" variant="secondary" onPress={() => setShareLink(summary.link)} style={{ flex: 1 }} />
+        </View>
         <StravaShare workout={summary.strava} />
         <ShareCardSheet content={card} onClose={() => setCard(null)} />
+        <WorkoutLinkSheet link={shareLink} onClose={() => setShareLink(null)} />
         <Button title="Done" onPress={() => close()} style={{ marginTop: 'auto', marginBottom: insets.bottom + space.md }} />
       </View>
     );
@@ -780,6 +789,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  shareRow: { flexDirection: 'row', gap: space.sm, marginTop: space.lg },
   screen: { flex: 1, backgroundColor: colors.background },
   summary: { paddingHorizontal: space.lg },
   stats: { flexDirection: 'row', marginTop: space.xl },
