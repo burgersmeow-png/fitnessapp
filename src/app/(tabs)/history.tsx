@@ -1,49 +1,32 @@
+import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '../../components/Icon';
 import { Card, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, EFFORTS, type CardioSession } from '../../lib/cardio';
 import { loadCardio, loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
+import { BADGES, weekProgress } from '../../lib/habits';
 import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
+import { checkBadges } from '../../services/habits';
 
-/** Consecutive weeks (Monday start) with at least one workout, counting back from this week. */
 type Entry = { kind: 'lift'; at: string; workout: WorkoutSummary } | { kind: 'cardio'; at: string; cardio: CardioSession };
-
-function weekStreak(dates: string[]): number {
-  const weekKey = (d: Date) => {
-    const monday = new Date(d);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-    return monday.getTime();
-  };
-  const weeks = new Set(dates.map((d) => weekKey(new Date(d))));
-  let streak = 0;
-  let cursor = weekKey(new Date());
-  // This week still counts if the user hasn't trained yet.
-  if (!weeks.has(cursor)) cursor -= 7 * 864e5;
-  while (weeks.has(cursor)) {
-    streak++;
-    cursor -= 7 * 864e5;
-  }
-  return streak;
-}
 
 export default function HistoryScreen() {
   const db = useSQLiteContext();
-  const [data] = useFocusData(async () => ({
-    workouts: await loadWorkouts(db),
-    cardio: await loadCardio(db),
-    settings: await loadSettings(db),
-  }));
+  const [data] = useFocusData(async () => {
+    const settings = await loadSettings(db);
+    const [workouts, cardio, badges] = await Promise.all([loadWorkouts(db), loadCardio(db), checkBadges(db, settings.weeklyGoal)]);
+    return { workouts, cardio, settings, badges: Object.keys(badges.earned).length };
+  });
   if (!data) return <Loading />;
   const { workouts, cardio, settings } = data;
   const entries: Entry[] = [
     ...workouts.map((w) => ({ kind: 'lift' as const, at: w.startedAt, workout: w })),
     ...cardio.map((c) => ({ kind: 'cardio' as const, at: c.startedAt, cardio: c })),
   ].sort((a, b) => b.at.localeCompare(a.at));
-  const streak = weekStreak(entries.map((e) => e.at));
+  const streak = weekProgress(entries.map((e) => e.at), settings.weeklyGoal).streak;
 
   return (
     <FlatList
@@ -52,17 +35,30 @@ export default function HistoryScreen() {
       data={entries}
       keyExtractor={(e) => (e.kind === 'lift' ? `w${e.workout.id}` : `c${e.cardio.id}`)}
       ListHeaderComponent={
-        <View style={{ flexDirection: 'row', gap: space.md }}>
-          <Card style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Card style={{ flex: 1, flexBasis: 0 }}>
             <Icon name="flame" size={20} color={colors.accent} />
-            <Text style={type.number}>{streak}</Text>
-            <Text style={type.label}>WEEK STREAK</Text>
+            <Text style={type.number}>
+              {streak}
+              <Text style={styles.of}> wk</Text>
+            </Text>
+            <Text style={type.label}>STREAK</Text>
           </Card>
-          <Card style={{ flex: 1 }}>
-            <Icon name="trophy" size={20} color={colors.warning} />
+          <Card style={{ flex: 1, flexBasis: 0 }}>
+            <Icon name="trophy" size={20} color={colors.success} />
             <Text style={type.number}>{entries.length}</Text>
             <Text style={type.label}>SESSIONS</Text>
           </Card>
+          <Pressable style={{ flex: 1, flexBasis: 0 }} onPress={() => router.push('/badges')} accessibilityRole="button" accessibilityLabel={`${data.badges} badges. Show all`}>
+            <Card style={{ flex: 1 }}>
+              <Icon name="medal" size={20} color={colors.warning} />
+              <Text style={type.number}>
+                {data.badges}
+                <Text style={styles.of}>/{BADGES.length}</Text>
+              </Text>
+              <Text style={type.label}>BADGES</Text>
+            </Card>
+          </Pressable>
         </View>
       }
       ListEmptyComponent={
@@ -124,6 +120,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+  of: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
   icon: {
     width: 44,
     height: 44,

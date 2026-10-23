@@ -32,6 +32,8 @@ import { StravaShare } from '../components/StravaShare';
 import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
 import { finishAssignedWorkout } from '../services/coaching';
+import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habits';
+import { goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/habits';
 import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
 
@@ -46,6 +48,8 @@ interface Summary {
   minutes: number;
   prs: string[];
   strava: WorkoutForStrava;
+  week: WeekProgress;
+  badges: Badge[];
 }
 
 export default function WorkoutScreen() {
@@ -293,6 +297,10 @@ export default function WorkoutScreen() {
         return;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const goal = settings?.weeklyGoal ?? 3;
+      const [badges, dates] = await Promise.all([checkBadges(db, goal), loadSessionDates(db)]);
+      // Celebrated here, so Today doesn't repeat them.
+      if (badges.fresh.length) markBadgesSeen(db);
       const minutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 6e4));
       // Per exercise, in workout order: set count and the best set by estimated 1RM.
       const byExercise = new Map<string, typeof finished>();
@@ -303,6 +311,8 @@ export default function WorkoutScreen() {
         volume: finished.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0),
         minutes,
         prs: prNames,
+        week: weekProgress(dates, goal),
+        badges: badges.fresh,
         strava: {
           startedAt: new Date(startedAt.current).toISOString(),
           minutes,
@@ -377,6 +387,29 @@ export default function WorkoutScreen() {
           <Stat label={`Volume (${settings?.units})`} value={formatNumber(summary.volume)} />
           <Stat label="Minutes" value={String(summary.minutes)} />
         </View>
+        <View style={styles.goalRow}>
+          <ProgressRing done={summary.week.done} total={summary.week.goal} size={56} stroke={5} what="training days" />
+          <View style={{ flex: 1, marginLeft: space.md }}>
+            <Text style={styles.goalTitle}>
+              {summary.week.streak > 1 ? `${summary.week.streak}-week streak` : summary.week.done >= summary.week.goal ? 'Weekly goal hit' : 'Weekly goal'}
+            </Text>
+            <Text style={styles.goalMeta}>{goalLine(summary.week)}</Text>
+          </View>
+        </View>
+        {summary.badges.slice(0, 2).map((b) => (
+          <View key={b.id} style={styles.badgeRow}>
+            <View style={styles.badgeIcon}>
+              <Icon name={b.icon} size={22} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1, marginLeft: space.md }}>
+              <Text style={styles.badgeEyebrow}>NEW BADGE</Text>
+              <Text style={styles.goalTitle}>{b.title}</Text>
+            </View>
+          </View>
+        ))}
+        {summary.badges.length > 2 && (
+          <Text style={[styles.goalMeta, { marginTop: space.sm }]}>{`+${summary.badges.length - 2} more in Badges`}</Text>
+        )}
         <StravaShare workout={summary.strava} />
         <Button title="Done" onPress={() => close()} style={{ marginTop: 'auto', marginBottom: insets.bottom + space.md }} />
       </View>
@@ -604,6 +637,21 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   summary: { paddingHorizontal: space.lg },
   stats: { flexDirection: 'row', marginTop: space.xl },
+  goalRow: { flexDirection: 'row', alignItems: 'center', marginTop: space.lg, padding: space.md, borderRadius: radius.md, backgroundColor: colors.surface },
+  goalTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  goalMeta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(245,181,61,0.1)',
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  badgeIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(245,181,61,0.16)' },
+  badgeEyebrow: { color: colors.warning, fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

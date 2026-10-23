@@ -49,6 +49,12 @@ export interface Settings {
   nutritionGoal: 'lose' | 'maintain' | 'gain';
   /** Post finished workouts and cardio to friends' feeds, when signed in. */
   shareWithFriends: boolean;
+  /** Training days per week to aim for. */
+  weeklyGoal: number;
+  /** Weekdays to remind on (0 = Sunday); empty means reminders are off. */
+  reminderDays: number[];
+  /** Minutes after midnight. */
+  reminderMinutes: number;
 }
 
 export interface PlannedExercise {
@@ -95,4 +101,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bodyWeightKg: null,
   nutritionGoal: 'maintain',
   shareWithFriends: true,
+  weeklyGoal: 3,
+  reminderDays: [],
+  reminderMinutes: 17 * 60 + 30,
 };

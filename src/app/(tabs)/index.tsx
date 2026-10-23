@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap';
 import { CoachPlanCard } from '../../components/CoachPlanCard';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
+import { GoalCard } from '../../components/GoalCard';
 import { Icon, type IconName } from '../../components/Icon';
 import { SectionLabel, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, cardioFatigue, type CardioSession } from '../../lib/cardio';
@@ -14,9 +15,12 @@ import { activeWorkoutId, loadCardio, loadExercises, loadFoodForDay, loadHistory
 import { dailyTargets, sumMacros, type Macros } from '../../lib/nutrition';
 import { formatNumber, MUSCLE_LABELS } from '../../lib/format';
 import { generateWorkout, type GeneratedWorkout } from '../../lib/generator';
+import { weekProgress, type Badge, type WeekProgress } from '../../lib/habits';
 import { colors, radius, space, TAP, type } from '../../lib/theme';
 import { ALL_MUSCLES, type Exercise, type Settings } from '../../lib/types';
 import { useFocusData } from '../../lib/useData';
+import { checkBadges, loadSessionDates } from '../../services/habits';
+import { syncReminders } from '../../services/reminders';
 import { syncStravaIfDue } from '../../services/strava';
 
 interface TodayData {
@@ -24,7 +28,8 @@ interface TodayData {
   exercises: Map<string, Exercise>;
   settings: Settings;
   activeId: number | null;
-  weekSessions: number;
+  week: WeekProgress;
+  freshBadges: Badge[];
   lastCardio: CardioSession | null;
   eaten: Macros;
   targets: Macros;
@@ -38,19 +43,18 @@ export default function TodayScreen() {
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
   const [data, reload] = useFocusData<TodayData>(async () => {
-    const [exercises, history, settings, activeId, cardio, food] = await Promise.all([
+    const [exercises, history, settings, activeId, cardio, food, sessionDates] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadSettings(db),
       activeWorkoutId(db),
       loadCardio(db, 7),
       loadFoodForDay(db, new Date()),
+      loadSessionDates(db),
     ]);
-    const weekAgo = Date.now() - 7 * 864e5;
-    const weekSessions = new Set([
-      ...history.filter((s) => new Date(s.completedAt).getTime() >= weekAgo).map((s) => s.completedAt.slice(0, 10)),
-      ...cardio.map((c) => c.startedAt.slice(0, 10)),
-    ]).size;
+    const badges = await checkBadges(db, settings.weeklyGoal);
+    // Re-plan reminders whenever Today opens, so they reflect what's been done.
+    syncReminders(db, settings);
     // Leave out a different slice of the library each time the user asks for another plan.
     const rotated = seed === 0 ? exercises : exercises.filter((_, i) => (i + seed) % 4 !== 0);
     return {
@@ -58,7 +62,8 @@ export default function TodayScreen() {
       exercises: new Map(exercises.map((e) => [e.id, e])),
       settings,
       activeId,
-      weekSessions,
+      week: weekProgress(sessionDates, settings.weeklyGoal),
+      freshBadges: badges.fresh,
       lastCardio: cardio[0] ?? null,
       eaten: sumMacros(food),
       targets: dailyTargets(settings.bodyWeightKg, settings.nutritionGoal, settings.goal),
@@ -71,7 +76,7 @@ export default function TodayScreen() {
   }, [db, reload]);
 
   if (!data) return <Loading />;
-  const { workout, exercises, settings, activeId, weekSessions, lastCardio } = data;
+  const { workout, exercises, settings, activeId, lastCardio } = data;
   const totalSets = workout.exercises.reduce((n, p) => n + p.sets, 0);
   const fresh = [...ALL_MUSCLES].sort((a, b) => workout.recovery[b] - workout.recovery[a]);
 
@@ -86,6 +91,8 @@ export default function TodayScreen() {
         {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}
       </Text>
       <Text style={[type.hero, { marginBottom: space.md }]}>Today</Text>
+
+      <GoalCard progress={data.week} fresh={data.freshBadges} />
 
       <CoachPlanCard activeId={activeId} />
 
@@ -228,15 +235,6 @@ export default function TodayScreen() {
         </View>
       </View>
 
-      <View style={[styles.card, styles.weekCard]}>
-        <Icon name="flame" size={28} color={colors.accent} />
-        <View style={{ marginLeft: space.md, flex: 1 }}>
-          <Text style={styles.rowTitle}>
-            {weekSessions} {weekSessions === 1 ? 'workout' : 'workouts'} this week
-          </Text>
-          <Text style={styles.rowMeta}>Recovery uses your last 72 hours of lifting and cardio.</Text>
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -338,7 +336,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  weekCard: { flexDirection: 'row', alignItems: 'center', marginTop: space.md },
 });
 
 /** Spoken summary of the recovery map: the muscles that still need rest. */

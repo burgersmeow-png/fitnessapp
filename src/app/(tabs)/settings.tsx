@@ -2,10 +2,12 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StravaCard } from '../../components/StravaCard';
+import { allowReminders, remindersSupported, syncReminders } from '../../services/reminders';
 import { stravaEnabled } from '../../services/strava';
 import { socialConfigured } from '../../services/supabase';
 import { Chip, SectionLabel, Loading } from '../../components/ui';
 import { fromKg, loadSettings, saveSettings, toKg } from '../../lib/db';
+import { formatTime } from '../../lib/habits';
 import { dailyTargets } from '../../lib/nutrition';
 import { colors, radius, space } from '../../lib/theme';
 import { ALL_EQUIPMENT, type Goal, type Settings } from '../../lib/types';
@@ -17,6 +19,18 @@ const GOALS: { value: Goal; label: string }[] = [
   { value: 'endurance', label: 'Endurance' },
 ];
 const LENGTHS = [30, 45, 60, 75];
+const GOAL_DAYS = [1, 2, 3, 4, 5, 6];
+// Monday first, as the weekly goal counts; values are JavaScript weekdays (0 = Sunday).
+const WEEKDAYS = [
+  { day: 1, label: 'Mon' },
+  { day: 2, label: 'Tue' },
+  { day: 3, label: 'Wed' },
+  { day: 4, label: 'Thu' },
+  { day: 5, label: 'Fri' },
+  { day: 6, label: 'Sat' },
+  { day: 0, label: 'Sun' },
+];
+const REMINDER_TIMES = [6 * 60 + 30, 8 * 60, 12 * 60, 17 * 60 + 30, 19 * 60, 20 * 60 + 30];
 const DIETS: { value: Settings['nutritionGoal']; label: string }[] = [
   { value: 'lose', label: 'Lose fat' },
   { value: 'maintain', label: 'Maintain' },
@@ -27,6 +41,7 @@ export default function SettingsScreen() {
   const db = useSQLiteContext();
   const [settings, reload] = useFocusData(() => loadSettings(db));
   const [weightText, setWeightText] = useState('');
+  const [notifyBlocked, setNotifyBlocked] = useState(false);
   useEffect(() => {
     if (settings) setWeightText(settings.bodyWeightKg ? String(Math.round(fromKg(settings.bodyWeightKg))) : '');
   }, [settings]);
@@ -34,8 +49,20 @@ export default function SettingsScreen() {
   const targets = dailyTargets(settings.bodyWeightKg, settings.nutritionGoal, settings.goal);
 
   const update = async (patch: Partial<Settings>) => {
-    await saveSettings(db, { ...settings, ...patch });
+    const next = { ...settings, ...patch };
+    await saveSettings(db, next);
     reload();
+    if ('reminderDays' in patch || 'reminderMinutes' in patch || 'weeklyGoal' in patch) syncReminders(db, next);
+  };
+  const toggleReminderDay = async (day: number) => {
+    const has = settings.reminderDays.includes(day);
+    // Ask for permission the first time a day is turned on, not on launch.
+    if (!has && settings.reminderDays.length === 0) {
+      const ok = await allowReminders();
+      setNotifyBlocked(!ok);
+      if (!ok) return;
+    }
+    update({ reminderDays: has ? settings.reminderDays.filter((d) => d !== day) : [...settings.reminderDays, day] });
   };
   const toggleEquipment = (e: (typeof ALL_EQUIPMENT)[number]) => {
     const has = settings.equipment.includes(e);
@@ -63,6 +90,39 @@ export default function SettingsScreen() {
           <Chip key={e} label={e[0].toUpperCase() + e.slice(1)} selected={settings.equipment.includes(e)} onPress={() => toggleEquipment(e)} />
         ))}
       </View>
+      <SectionLabel>Weekly goal</SectionLabel>
+      <View style={styles.wrap}>
+        {GOAL_DAYS.map((n) => (
+          <Chip key={n} label={`${n} ${n === 1 ? 'day' : 'days'}`} selected={settings.weeklyGoal === n} onPress={() => update({ weeklyGoal: n })} />
+        ))}
+      </View>
+      <Text style={styles.note}>Days you train each week, lifting or cardio. Hit it to build your streak. A goal you can keep beats an ambitious one you can’t.</Text>
+      <SectionLabel>Training reminders</SectionLabel>
+      {remindersSupported ? (
+        <>
+          <View style={styles.wrap}>
+            {WEEKDAYS.map((w) => (
+              <Chip key={w.day} label={w.label} selected={settings.reminderDays.includes(w.day)} onPress={() => toggleReminderDay(w.day)} />
+            ))}
+          </View>
+          {settings.reminderDays.length > 0 && (
+            <View style={[styles.wrap, { marginTop: space.sm }]}>
+              {REMINDER_TIMES.map((m) => (
+                <Chip key={m} label={formatTime(m)} selected={settings.reminderMinutes === m} onPress={() => update({ reminderMinutes: m })} />
+              ))}
+            </View>
+          )}
+          <Text style={styles.note}>
+            {notifyBlocked
+              ? 'Notifications are off for this app. Turn them on in the iPhone Settings app, then pick your days again.'
+              : settings.reminderDays.length === 0
+                ? 'Pick the days you plan to train and we’ll nudge you. Off for now.'
+                : 'No reminder on a day you’ve already trained, or once this week’s goal is hit.'}
+          </Text>
+        </>
+      ) : (
+        <Text style={[styles.note, { marginTop: 0 }]}>Reminders work in the app on your phone.</Text>
+      )}
       <SectionLabel>Body weight</SectionLabel>
       <View style={styles.weightRow}>
         <TextInput

@@ -49,6 +49,9 @@ const ICONS = {
   message: { sf: 'message.fill', ion: 'chatbubbles' },
   calendar: { sf: 'calendar.badge.plus', ion: 'calendar-outline' },
   barcode: { sf: 'barcode.viewfinder', ion: 'barcode-outline' },
+  medal: { sf: 'medal.fill', ion: 'medal' },
+  bell: { sf: 'bell.fill', ion: 'notifications' },
+  lock: { sf: 'lock.fill', ion: 'lock-closed' },
 } as const satisfies Record<string, { sf: SFSymbol; ion: keyof typeof Ionicons.glyphMap }>;
 
 export type IconName = keyof typeof ICONS;
