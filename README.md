@@ -170,6 +170,13 @@ workout rides inside the link (`?w=…`, see `src/lib/workoutLink.ts`), so no se
   Custom lifts the follower doesn't have are matched by name, or skipped with a note.
 - The landing page address comes from `EXPO_PUBLIC_SITE_URL` (defaults to the GitHub Pages site).
 
+## Challenges
+
+Today → **Start a challenge** sets a goal like 12 training days in 4 weeks (`src/lib/challenge.ts`).
+**Invite people** shares a link (`?c=…`) that opens the landing page and then `liftlab://challenge?c=…`,
+where followers join with one tap. Each phone counts its own training days; lifting and cardio both
+count, once per day. **Share story** makes a progress card. No server is involved.
+
 ## Creator codes (influencer promotion)
 
 Each creator gets a code like `ALEX10`. Followers type it on the first screen of the app (or later in Settings), or tap the creator's link, which fills it in for them: `https://your-app-link/?code=ALEX10`. The app shows "Welcome from Alex" with the creator's own message.

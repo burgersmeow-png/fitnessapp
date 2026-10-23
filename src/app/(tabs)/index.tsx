@@ -8,6 +8,7 @@ import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap'
 import { CoachPlanCard } from '../../components/CoachPlanCard';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { GoalCard } from '../../components/GoalCard';
+import { ProgressRing } from '../../components/ProgressRing';
 import { Icon, type IconName } from '../../components/Icon';
 import { SectionLabel, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, cardioFatigue, type CardioSession } from '../../lib/cardio';
@@ -25,6 +26,8 @@ import { useFocusData } from '../../lib/useData';
 import { checkBadges, loadSessionDates } from '../../services/habits';
 import { loadProgram, rememberProgramWorkout } from '../../services/programs';
 import { loadSaved } from '../../services/savedWorkouts';
+import { loadChallenge } from '../../services/challenge';
+import { challengeProgress, type ChallengeProgress, type JoinedChallenge } from '../../lib/challenge';
 import { syncReminders } from '../../services/reminders';
 import { syncStravaIfDue } from '../../services/strava';
 
@@ -41,6 +44,7 @@ interface TodayData {
   eaten: Macros;
   targets: Macros;
   savedCount: number;
+  challenge: { def: JoinedChallenge; progress: ChallengeProgress } | null;
 }
 
 const GOAL_LABEL = { strength: 'Strength', hypertrophy: 'Muscle', endurance: 'Endurance' };
@@ -51,7 +55,7 @@ export default function TodayScreen() {
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
   const [data, reload] = useFocusData<TodayData>(async () => {
-    const [exercises, history, settings, activeId, cardio, food, sessionDates, program, saved] = await Promise.all([
+    const [exercises, history, settings, activeId, cardio, food, sessionDates, program, saved, challenge] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadSettings(db),
@@ -61,6 +65,7 @@ export default function TodayScreen() {
       loadSessionDates(db),
       loadProgram(db),
       loadSaved(db),
+      loadChallenge(db),
     ]);
     const badges = await checkBadges(db, settings.weeklyGoal);
     // Re-plan reminders whenever Today opens, so they reflect what's been done.
@@ -84,6 +89,7 @@ export default function TodayScreen() {
       eaten: sumMacros(food),
       targets: dailyTargets(settings.bodyWeightKg, settings.nutritionGoal, settings.goal),
       savedCount: saved.length,
+      challenge: challenge ? { def: challenge, progress: challengeProgress(challenge, sessionDates, new Date()) } : null,
     };
   }, [seed]);
 
@@ -226,6 +232,33 @@ export default function TodayScreen() {
               <View style={[styles.programFill, { width: `${Math.round(following.progress * 100)}%` }]} />
             </View>
           )}
+        </View>
+        <Icon name="chevron" size={20} color={colors.textMuted} />
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push('/challenge')}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.cardioCard, { marginBottom: space.sm }, pressed && { opacity: 0.8 }]}
+      >
+        {data.challenge ? (
+          <ProgressRing done={data.challenge.progress.done} total={data.challenge.def.sessions} size={48} stroke={4} what="challenge sessions" />
+        ) : (
+          <View style={styles.cardioIcon}>
+            <Icon name="flame" size={22} color={colors.accent} />
+          </View>
+        )}
+        <View style={{ flex: 1, marginLeft: space.md }}>
+          <Text style={styles.rowTitle}>{data.challenge ? data.challenge.def.title : 'Start a challenge'}</Text>
+          <Text style={styles.rowMeta}>
+            {!data.challenge
+              ? 'Like 12 workouts in 4 weeks. Invite friends with a link.'
+              : data.challenge.progress.status === 'won'
+                ? 'Challenge won! Share it or start another.'
+                : data.challenge.progress.status === 'missed'
+                  ? 'This one’s over. Start another?'
+                  : `Day ${data.challenge.progress.day} of ${data.challenge.def.days} · ${data.challenge.progress.done} of ${data.challenge.def.sessions} sessions`}
+          </Text>
         </View>
         <Icon name="chevron" size={20} color={colors.textMuted} />
       </Pressable>

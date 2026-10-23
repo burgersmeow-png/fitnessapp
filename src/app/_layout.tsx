@@ -46,6 +46,7 @@ export default function RootLayout() {
           <Stack.Screen name="exercise-new" options={{ title: '', presentation: 'modal' }} />
           <Stack.Screen name="try" options={{ title: '', presentation: 'modal' }} />
           <Stack.Screen name="saved" options={{ title: 'Saved workouts', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="challenge" options={{ title: 'Challenge', headerBackTitle: 'Back' }} />
           <Stack.Screen name="cardio" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="food-add" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="coach" options={{ presentation: 'modal', headerShown: false }} />

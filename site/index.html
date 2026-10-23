@@ -88,6 +88,13 @@
       <p class="code-note">Weights are picked from your own history in the app.</p>
     </section>
 
+    <section class="workout" id="challenge" hidden aria-labelledby="challenge-rules">
+      <div class="code-label">Challenge</div>
+      <h2 id="challenge-rules" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
+      <p class="code-note">Lifting and cardio both count, once per day. Day 1 is the day you join.</p>
+      <a class="button open" id="open-challenge" href="#">Join in LiftLab</a>
+    </section>
+
     <section class="code-card" id="code-card" hidden aria-labelledby="code-label">
       <div class="code-label" id="code-label">Your creator code</div>
       <div class="code-row">
@@ -151,15 +158,43 @@
         $('workout').hidden = false;
       }
 
-      function decodeWorkout(w) {
-        if (!w || !/^[A-Za-z0-9_-]+$/.test(w) || w.length > 4000) return null;
+      // A challenge invite (?c=...): same format as src/lib/challenge.ts.
+      var challenge = decodeChallenge(params.get('c'));
+      if (challenge && !workout) {
+        document.title = challenge.title + ' · LiftLab challenge';
+        $('eyebrow').textContent = 'Join the challenge';
+        $('headline').textContent = challenge.title;
+        $('challenge-rules').textContent = challenge.sessions + ' training days in ' + challenge.days + ' days';
+        $('open-challenge').href = 'liftlab://challenge?c=' + params.get('c');
+        $('challenge').hidden = false;
+      }
+
+      function decodeJson(s, max) {
+        if (!s || !/^[A-Za-z0-9_-]+$/.test(s) || s.length > max) return null;
         try {
-          var b64 = w.replace(/-/g, '+').replace(/_/g, '/');
+          var b64 = s.replace(/-/g, '+').replace(/_/g, '/');
           while (b64.length % 4) b64 += '=';
           var bin = atob(b64);
           var bytes = new Uint8Array(bin.length);
           for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          var raw = JSON.parse(new TextDecoder().decode(bytes));
+          return JSON.parse(new TextDecoder().decode(bytes));
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function decodeChallenge(c) {
+        var raw = decodeJson(c, 400);
+        if (!Array.isArray(raw) || raw[0] !== 1) return null;
+        var sessions = Math.round(raw[2]), days = Math.round(raw[3]);
+        if (!(days >= 3 && days <= 100) || !(sessions >= 1 && sessions <= days)) return null;
+        var title = (typeof raw[1] === 'string' && raw[1].trim().slice(0, 32)) || sessions + ' in ' + days + ' days';
+        return { title: title, sessions: sessions, days: days };
+      }
+
+      function decodeWorkout(w) {
+        var raw = decodeJson(w, 4000);
+        try {
           if (!Array.isArray(raw) || raw[0] !== 1 || !Array.isArray(raw[2])) return null;
           var lifts = raw[2].slice(0, 15).filter(function (l) {
             return Array.isArray(l) && typeof l[1] === 'string' && typeof l[2] === 'number' && typeof l[3] === 'number';
@@ -175,6 +210,7 @@
       $('code').textContent = code;
       $('code-card').hidden = false;
       if (workout) $('open-app').href += '&code=' + code;
+      else if (challenge) $('open-challenge').href += '&code=' + code;
       else $('eyebrow').textContent = 'You’re invited';
 
       function copy() {
@@ -193,8 +229,8 @@
             return;
           }
           var name = r.body.creatorName;
-          if (workout) {
-            $('eyebrow').textContent = name + '’s workout';
+          if (workout || challenge) {
+            $('eyebrow').textContent = name + (workout ? '’s workout' : '’s challenge');
           } else {
             document.title = name + ' invited you to LiftLab';
             $('eyebrow').textContent = name + ' invited you';
