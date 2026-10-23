@@ -22,7 +22,7 @@ export default function TabsLayout() {
         headerShadowVisible: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('flash') }} />
+      <Tabs.Screen name="index" options={{ title: 'Today', headerShown: false, tabBarIcon: icon('flash') }} />
       <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: icon('calendar') }} />
       <Tabs.Screen name="exercises" options={{ title: 'Exercises', tabBarIcon: icon('barbell') }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('options') }} />

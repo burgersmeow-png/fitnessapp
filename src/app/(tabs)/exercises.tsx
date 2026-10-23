@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { Chip } from '../../components/ui';
 import { loadExercises } from '../../lib/db';
 import { MUSCLE_LABELS } from '../../lib/format';
@@ -49,10 +50,13 @@ export default function ExercisesScreen() {
         contentContainerStyle={{ paddingHorizontal: space.md, paddingBottom: space.xl }}
         renderItem={({ item }) => (
           <Pressable style={styles.row} onPress={() => router.push(`/exercise/${item.id}`)}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.meta}>
-              {item.primary.map((m) => MUSCLE_LABELS[m]).join(', ')} · {item.equipment}
-            </Text>
+            <ExerciseThumb exercise={item} size={52} />
+            <View style={{ flex: 1, marginLeft: space.md }}>
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.meta}>
+                {item.primary.map((m) => MUSCLE_LABELS[m]).join(', ')} · {item.equipment}
+              </Text>
+            </View>
           </Pressable>
         )}
       />
@@ -70,7 +74,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     fontSize: 16,
   },
-  row: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   name: { color: colors.text, fontSize: 17, fontWeight: '600' },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2, textTransform: 'capitalize' },
 });

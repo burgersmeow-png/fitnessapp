@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BodyMap, type MuscleFills } from '../../components/BodyMap';
 import { Card, SectionLabel } from '../../components/ui';
 import { loadExercises, loadHistory, loadSettings } from '../../lib/db';
 import { formatDate, MUSCLE_LABELS } from '../../lib/format';
@@ -29,6 +30,9 @@ export default function ExerciseScreen() {
   const { exercise, sessions, units } = data;
   const best = Math.max(0, ...sessions.map((s) => s.e1rm));
   const recent = sessions.slice(-12);
+  const fills: MuscleFills = {};
+  for (const m of exercise.secondary) fills[m] = { color: colors.accent, opacity: 0.4 };
+  for (const m of exercise.primary) fills[m] = { color: colors.accent };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md }}>
@@ -36,6 +40,14 @@ export default function ExerciseScreen() {
       <Text style={[type.body, { color: colors.textMuted, marginTop: space.xs, textTransform: 'capitalize' }]}>
         {[...exercise.primary, ...exercise.secondary].map((m) => MUSCLE_LABELS[m]).join(', ')} · {exercise.equipment}
       </Text>
+
+      <Card style={{ alignItems: 'center', marginTop: space.md }}>
+        <BodyMap fills={fills} height={200} />
+        <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.sm }}>
+          <Text style={[type.label, { color: colors.accent }]}>● PRIMARY</Text>
+          <Text style={[type.label, { color: colors.accent, opacity: 0.6 }]}>● SECONDARY</Text>
+        </View>
+      </Card>
 
       <SectionLabel>Estimated 1-rep max</SectionLabel>
       <Card>
@@ -60,7 +72,7 @@ export default function ExerciseScreen() {
                 </View>
               ))}
             </View>
-            <Text style={[type.label, { marginTop: space.xs }]}>LAST {recent.length} SESSIONS</Text>
+            <Text style={[type.label, { marginTop: space.xs }]}>{recent.length === 1 ? 'FIRST SESSION' : `LAST ${recent.length} SESSIONS`}</Text>
           </>
         )}
       </Card>

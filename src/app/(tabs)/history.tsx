@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSQLiteContext } from 'expo-sqlite';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Card } from '../../components/ui';
@@ -42,19 +43,25 @@ export default function HistoryScreen() {
       ListHeaderComponent={
         <View style={{ flexDirection: 'row', gap: space.md }}>
           <Card style={{ flex: 1 }}>
+            <Ionicons name="flame" size={20} color={colors.accent} />
             <Text style={type.number}>{streak}</Text>
             <Text style={type.label}>WEEK STREAK</Text>
           </Card>
           <Card style={{ flex: 1 }}>
+            <Ionicons name="trophy" size={20} color={colors.warning} />
             <Text style={type.number}>{workouts.length}</Text>
             <Text style={type.label}>WORKOUTS</Text>
           </Card>
         </View>
       }
       ListEmptyComponent={
-        <Text style={[type.body, { color: colors.textMuted, textAlign: 'center', marginTop: space.xl }]}>
-          Finished workouts show up here.
-        </Text>
+        <View style={{ alignItems: 'center', marginTop: space.xl }}>
+          <Ionicons name="barbell" size={56} color={colors.border} />
+          <Text style={[type.title, { marginTop: space.md }]}>No workouts yet</Text>
+          <Text style={[type.body, { color: colors.textMuted, textAlign: 'center', marginTop: space.xs }]}>
+            Finish your first workout and it shows up here.
+          </Text>
+        </View>
       }
       renderItem={({ item }) => (
         <Card>

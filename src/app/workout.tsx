@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ExerciseThumb } from '../components/ExerciseThumb';
 import { Button, Card } from '../components/ui';
 import {
   activeWorkoutId,
@@ -16,7 +17,7 @@ import {
   updateSet,
   type WorkoutSet,
 } from '../lib/db';
-import { formatClock, formatNumber } from '../lib/format';
+import { formatClock, formatNumber, MUSCLE_LABELS } from '../lib/format';
 import { estimate1RM, personalRecords } from '../lib/progression';
 import { colors, radius, space, TAP, type } from '../lib/theme';
 import type { Exercise, Settings } from '../lib/types';
@@ -204,10 +205,15 @@ export default function WorkoutScreen() {
           const left = g.sets.filter((s) => !s.completedAt).length;
           return (
             <Card key={`${g.exerciseId}-${g.sets[0].id}`} style={{ marginBottom: space.md }}>
-              <Pressable onPress={() => router.push(`/exercise/${g.exerciseId}`)}>
-                <Text style={type.title}>{e?.name}</Text>
+              <Pressable onPress={() => router.push(`/exercise/${g.exerciseId}`)} style={styles.exHeader}>
+                {e && <ExerciseThumb exercise={e} size={52} />}
+                <View style={{ flex: 1, marginLeft: space.md }}>
+                  <Text style={[type.title, { fontSize: 19 }]}>{e?.name}</Text>
+                  <Text style={styles.meta}>{e?.primary.map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
+                </View>
+                {left === 0 && <Text style={styles.doneBadge}>✓</Text>}
               </Pressable>
-              <Text style={styles.meta}>
+              <Text style={[styles.meta, { marginBottom: space.sm }]}>
                 {left > 0 ? `${left} to go` : 'All sets done'} · target {g.sets[0].targetReps} reps, {g.sets[0].targetRir} in reserve
               </Text>
               <View style={styles.columns}>
@@ -323,7 +329,9 @@ const styles = StyleSheet.create({
   headerTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   progressTrack: { height: 4, backgroundColor: colors.surfaceRaised },
   progressFill: { height: 4, backgroundColor: colors.accent },
-  meta: { color: colors.textMuted, fontSize: 14, marginTop: 2, marginBottom: space.sm },
+  meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+  exHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },
+  doneBadge: { color: colors.success, fontSize: 22, fontWeight: '800' },
   columns: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.xs },
   colLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '700', textAlign: 'center' },
   setRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.sm },
