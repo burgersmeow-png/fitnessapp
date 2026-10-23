@@ -201,6 +201,7 @@ Code layout:
 - `src/lib/habits.ts` weekly goal, streaks, badges, reminder times; `src/lib/programs.ts` training programs
 - `src/lib/onboarding.ts` first-run answers to settings and a starting program (`src/app/welcome.tsx`)
 - `src/lib/progress.ts` body weight trend, strength per lift, training days per week; `src/components/LineChart.tsx`
+- `src/lib/plates.ts` warm-up sets and plates per side of the bar (`src/components/workout/LiftTools.tsx`)
 - `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
 - `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
 - `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting

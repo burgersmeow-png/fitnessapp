@@ -16,6 +16,9 @@ export const colors = {
   strava: '#FC4C02',
 };
 
+/** Plate colours by size, heaviest first (competition colours, so they match the gym). */
+export const plateColors = ['#E5484D', '#3E63DD', '#F5B53D', '#2FD07A', '#E8E8EC', '#7C828D', '#5A5F6A'];
+
 export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
 
 export const radius = { sm: 8, md: 14, lg: 20 };

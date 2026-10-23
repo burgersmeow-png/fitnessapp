@@ -37,6 +37,7 @@ import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habit
 import { goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/habits';
 import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
+import { LiftTools } from '../components/workout/LiftTools';
 
 function close() {
   if (router.canGoBack()) router.back();
@@ -447,8 +448,10 @@ export default function WorkoutScreen() {
       {coachOpen && <CoachBar reply={coachReply} examples={EXAMPLES.workout} placeholder="Say “8 reps at 100”" onSubmit={runCommand} />}
 
       <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 160 }} keyboardShouldPersistTaps="handled">
-        {groups.map((g) => {
+        {groups.map((g, gi) => {
           const e = exercises.get(g.exerciseId);
+          const firstHeavy =
+            groups.findIndex((x) => exercises.get(x.exerciseId)?.compound && x.sets.every((s) => !s.completedAt)) === gi;
           const left = g.sets.filter((s) => !s.completedAt).length;
           return (
             <Card key={`${g.exerciseId}-${g.sets[0].id}`} style={{ marginBottom: space.md }}>
@@ -468,6 +471,15 @@ export default function WorkoutScreen() {
               <Text style={[styles.meta, { marginBottom: space.sm }]}>
                 {left > 0 ? `${left} to go` : 'All sets done'} · target {g.sets[0].targetReps} reps, {g.sets[0].targetRir} in reserve
               </Text>
+              {e && left > 0 && (
+                <LiftTools
+                  exercise={e}
+                  units={settings?.units ?? 'lb'}
+                  working={g.sets[0].weight}
+                  next={(g.sets.find((s) => !s.completedAt) ?? g.sets[g.sets.length - 1]).weight}
+                  warmupFirst={firstHeavy}
+                />
+              )}
               <View style={styles.columns}>
                 <Text style={[styles.colLabel, { width: 28 }]}>SET</Text>
                 <Pressable onPress={toggleUnits} style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel="Switch between kilograms and pounds">
