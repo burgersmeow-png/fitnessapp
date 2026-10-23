@@ -2,7 +2,7 @@
 // it active after their first workout. No sign-in needed, since most people never make an account.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readJson, send } from './http';
-import { canAlert, chunks, crewBoard, crewWeek, parseCrewJoin, parseCrewSync, type CrewRow, dailyCounts, dailyOpens, newPins, parseClaim, parsePinsRequest, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
+import { canAlert, chunks, crewMemberId, parseCrewHide, crewBoard, crewWeek, parseCrewJoin, parseCrewSync, type CrewRow, dailyCounts, dailyOpens, newPins, parseClaim, parsePinsRequest, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
 import { admin, databaseConfigured } from './supabase';
 import type { Pin } from './referralRules';
 
@@ -120,7 +120,12 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       } else if (action !== 'board') {
         return send(res, 404, { error: 'Not found' }), true;
       }
-      const { data: rows } = await admin().from('creator_crew').select('install_id, nickname, days, updated_at').eq('code', creator.code).eq('week', week);
+      const { data: rows } = await admin()
+        .from('creator_crew')
+        .select('install_id, nickname, days, updated_at')
+        .eq('code', creator.code)
+        .eq('week', week)
+        .eq('hidden', false);
       const board = crewBoard((rows ?? []) as CrewRow[], installId);
       return send(res, 200, { creatorName: creator.creator_name, week, ...board }), true;
     }
@@ -150,7 +155,7 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       const { data: c } = await admin().from('creator_codes').select('code, creator_name, stats_token, pins').eq('code', ask.code).maybeSingle();
       if (!c || !tokensMatch(c.stats_token, ask.token)) return denied(), true;
       const since = new Date(Date.now() - 14 * 864e5).toISOString();
-      const [{ data: stats }, { data: recent }, { data: opens }, { data: uses }] = await Promise.all([
+      const [{ data: stats }, { data: recent }, { data: opens }, { data: uses }, { data: crew }] = await Promise.all([
         admin().from('creator_stats').select('signups, active_users, signups_last_7_days').eq('code', ask.code).single(),
         admin()
           .from('referrals')
@@ -159,6 +164,14 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
           .gte('created_at', since),
         admin().from('creator_link_opens').select('day, opens').eq('code', ask.code).gte('day', since.slice(0, 10)),
         admin().from('creator_pin_uses').select('pin_hash').eq('code', ask.code),
+        // This week's crew, plus anyone hidden (so they can be shown again).
+        admin()
+          .from('creator_crew')
+          .select('install_id, nickname, days, hidden')
+          .eq('code', ask.code)
+          .or(`week.eq.${crewWeek(new Date())},hidden.eq.true`)
+          .order('days', { ascending: false })
+          .limit(100),
       ]);
       return send(res, 200, {
         code: c.code,
@@ -166,10 +179,29 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
         signups: stats?.signups ?? 0,
         activeUsers: stats?.active_users ?? 0,
         signupsLast7Days: stats?.signups_last_7_days ?? 0,
+        crew: ((crew ?? []) as { install_id: string; nickname: string; days: number; hidden: boolean }[]).map((m) => ({
+          id: crewMemberId(m.install_id),
+          nickname: m.nickname,
+          days: m.days,
+          hidden: m.hidden,
+        })),
         pins: pinsWithUses((c.pins ?? []) as Pin[], (uses ?? []) as { pin_hash: string }[]),
         dailyOpens: dailyOpens((opens ?? []) as { day: string; opens: number }[], new Date()),
         daily: dailyCounts((recent ?? []).map((r: { created_at: string }) => r.created_at), new Date()),
       }), true;
+    }
+    if (req.method === 'POST' && url.pathname === '/ref/crew-hide') {
+      // The creator moderating their crew leaderboard.
+      const ask = parseCrewHide(await readJson(req, 256));
+      if (!ask) return send(res, 400, { error: 'Bad request' }), true;
+      const { data: c } = await admin().from('creator_codes').select('stats_token').eq('code', ask.code).maybeSingle();
+      if (!c || !tokensMatch(c.stats_token, ask.token)) return send(res, 403, { error: 'That dashboard link isn’t valid. Ask for a new one.' }), true;
+      const { data: members } = await admin().from('creator_crew').select('install_id').eq('code', ask.code);
+      const member = (members ?? []).find((m: { install_id: string }) => crewMemberId(m.install_id) === ask.id);
+      if (!member) return send(res, 404, { error: 'That person isn’t in your crew any more.' }), true;
+      const { error } = await admin().from('creator_crew').update({ hidden: ask.hidden }).eq('install_id', member.install_id);
+      if (error) throw error;
+      return send(res, 200, { ok: true }), true;
     }
     if (req.method === 'POST' && url.pathname === '/ref/pins') {
       // The creator's public page: what shows when followers open their link.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canAlert, chunks, crewBoard, crewWeek, parseCrewJoin, parseCrewSync, dailyCounts, dailyOpens, newPins, parseClaim, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
+import { canAlert, chunks, crewMemberId, parseCrewHide, crewBoard, crewWeek, parseCrewJoin, parseCrewSync, dailyCounts, dailyOpens, newPins, parseClaim, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
 
 test('claims need a real code and install id', () => {
   const installId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -135,4 +135,14 @@ test('the crew board ranks by days, ties share a place, and shows me if I am fur
   assert.equal(board.total, 4);
   assert.equal(crewBoard(rows, 'e').me?.days, 0);
   assert.equal(crewBoard(rows, 'zzz').me, null);
+});
+
+test('creators hide crew members by an id that does not reveal the install', () => {
+  const id = crewMemberId('abcdef0123456789');
+  assert.match(id, /^[a-f0-9]{16}$/);
+  assert.notEqual(id, crewMemberId('abcdef0123456780'));
+  const auth = { code: 'ALEX10', token: 'a'.repeat(32) };
+  assert.deepEqual(parseCrewHide({ ...auth, id, hidden: true }), { ...auth, id, hidden: true });
+  assert.equal(parseCrewHide({ ...auth, id: 'abcdef0123456789', hidden: 'yes' }), null);
+  assert.equal(parseCrewHide({ ...auth, id: 'not-hex', hidden: true }), null);
 });
