@@ -24,7 +24,7 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerLargeTitle: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="workout" options={{ title: 'Workout', presentation: 'fullScreenModal', headerShown: false }} />
-          <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
+          <Stack.Screen name="exercise/[id]" options={{ title: '', presentation: 'modal' }} />
           <Stack.Screen name="cardio" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
       </ThemeProvider>

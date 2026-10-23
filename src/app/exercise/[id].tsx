@@ -2,9 +2,11 @@ import { useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BodyMap, type MuscleFills } from '../../components/BodyMap';
+import { ExerciseDemo } from '../../components/ExerciseDemo';
 import { Card, SectionLabel } from '../../components/ui';
 import { loadExercises, loadHistory, loadSettings } from '../../lib/db';
 import { formatDate, MUSCLE_LABELS } from '../../lib/format';
+import { EXERCISE_MEDIA, EXTRA_INSTRUCTIONS } from '../../lib/exerciseMedia';
 import { estimate1RM } from '../../lib/progression';
 import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
@@ -30,6 +32,7 @@ export default function ExerciseScreen() {
   const { exercise, sessions, units } = data;
   const best = Math.max(0, ...sessions.map((s) => s.e1rm));
   const recent = sessions.slice(-12);
+  const steps = EXERCISE_MEDIA[exercise.id]?.instructions ?? EXTRA_INSTRUCTIONS[exercise.id] ?? [];
   const fills: MuscleFills = {};
   for (const m of exercise.secondary) fills[m] = { color: colors.accent, opacity: 0.4 };
   for (const m of exercise.primary) fills[m] = { color: colors.accent };
@@ -41,7 +44,22 @@ export default function ExerciseScreen() {
         {[...exercise.primary, ...exercise.secondary].map((m) => MUSCLE_LABELS[m]).join(', ')} · {exercise.equipment}
       </Text>
 
-      <Card style={{ alignItems: 'center', marginTop: space.md }}>
+      <View style={{ marginTop: space.md }}>
+        <ExerciseDemo exerciseId={exercise.id} />
+      </View>
+
+      {steps.length > 0 && <SectionLabel>How to do it</SectionLabel>}
+      {steps.map((step, i) => (
+        <View key={i} style={styles.step}>
+          <View style={styles.stepNum}>
+            <Text style={styles.stepNumText}>{i + 1}</Text>
+          </View>
+          <Text style={[type.body, { flex: 1, lineHeight: 22 }]}>{step}</Text>
+        </View>
+      ))}
+
+      <SectionLabel>Muscles worked</SectionLabel>
+      <Card style={{ alignItems: 'center' }}>
         <BodyMap fills={fills} height={200} />
         <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.sm }}>
           <Text style={[type.label, { color: colors.accent }]}>● PRIMARY</Text>
@@ -95,6 +113,17 @@ const styles = StyleSheet.create({
   chart: { flexDirection: 'row', alignItems: 'flex-end', height: 120, marginTop: space.md, gap: 6 },
   barSlot: { flex: 1, maxWidth: 28, height: '100%', justifyContent: 'flex-end' },
   bar: { width: '100%', backgroundColor: colors.accent, borderRadius: 4 },
+  step: { flexDirection: 'row', gap: space.md, marginBottom: space.md },
+  stepNum: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  stepNumText: { color: colors.accentText, fontWeight: '800', fontSize: 14 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
