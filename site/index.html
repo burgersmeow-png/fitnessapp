@@ -74,6 +74,8 @@
     .browser { display: block; margin-top: 12px; color: var(--text); font-weight: 700; text-align: center; text-underline-offset: 3px; }
     .beat { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 90, 31, 0.12); }
     .beat b { font-size: 24px; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .crew { margin: 12px 0 0; color: var(--text); font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .crew::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: #2fd07a; box-shadow: 0 0 0 4px rgba(47, 208, 122, 0.2); flex-shrink: 0; margin: 0 4px; }
     .pins { margin-top: 28px; }
     .pins ul { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 10px; }
     .pins a { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text); text-decoration: none; }
@@ -94,6 +96,7 @@
     <h1 id="headline">Workouts that adapt to you</h1>
     <p class="lead">Every session is planned from what you’ve recovered from, the equipment you have and how your last sets went.</p>
     <p class="welcome" id="welcome" hidden></p>
+    <p class="crew" id="crew" hidden></p>
 
     <section class="workout" id="workout" hidden aria-labelledby="workout-title">
       <div class="code-label">Shared workout</div>
@@ -356,6 +359,10 @@
               $('pin-list').appendChild(li);
             });
             $('pins').hidden = false;
+          }
+          if (r.body.crewThisWeek > 1) {
+            $('crew').textContent = r.body.crewThisWeek + ' people trained with ' + name + ' this week.';
+            $('crew').hidden = false;
           }
           if (r.body.welcome) {
             $('welcome').textContent = '“' + r.body.welcome + '”';

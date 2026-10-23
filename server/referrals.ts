@@ -56,7 +56,15 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       const code = url.searchParams.get('code');
       const found = validCode(code) ? await lookup(code!) : null;
       if (!found) return send(res, 404, { error: 'That code isn’t valid. Check the spelling with your creator.' }), true;
-      return send(res, 200, { code: found.code, creatorName: found.creator_name, welcome: found.welcome, pins: found.pins ?? [] }), true;
+      // Social proof for the landing page and the app: how many of the crew trained this week.
+      const { count } = await admin()
+        .from('creator_crew')
+        .select('install_id', { count: 'exact', head: true })
+        .eq('code', found.code)
+        .eq('week', crewWeek(new Date()))
+        .eq('hidden', false)
+        .gt('days', 0);
+      return send(res, 200, { code: found.code, creatorName: found.creator_name, welcome: found.welcome, pins: found.pins ?? [], crewThisWeek: count ?? 0 }), true;
     }
     if (req.method === 'POST' && url.pathname === '/ref/open') {
       // The landing page was opened with this code. Sent with sendBeacon, so the body is plain text.
