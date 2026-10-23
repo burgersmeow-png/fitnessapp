@@ -72,6 +72,8 @@
     .workout .lift { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .workout .sets { color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
     .browser { display: block; margin-top: 12px; color: var(--text); font-weight: 700; text-align: center; text-underline-offset: 3px; }
+    .beat { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 90, 31, 0.12); }
+    .beat b { font-size: 24px; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
     .open { display: flex; width: 100%; margin-top: 16px; background: var(--accent); color: var(--accent-text); font-size: 18px; }
     .error { color: #f5b53d; }
     [hidden] { display: none !important; }
@@ -90,6 +92,7 @@
     <section class="workout" id="workout" hidden aria-labelledby="workout-title">
       <div class="code-label">Shared workout</div>
       <h2 id="workout-title" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
+      <div class="beat" id="beat" hidden><span class="code-label">Volume to beat</span><b id="beat-volume"></b></div>
       <ol id="lifts"></ol>
       <a class="button open" id="open-app" href="#">Open in LiftLab</a>
       <a class="browser" id="open-app-web" href="#" hidden>No iPhone? Try it in your browser</a>
@@ -174,6 +177,11 @@
           li.appendChild(sets);
           $('lifts').appendChild(li);
         });
+        if (workout.beat) {
+          $('eyebrow').textContent = 'Can you beat this workout?';
+          $('beat-volume').textContent = workout.beat.volume.toLocaleString('en-US') + ' ' + workout.beat.units;
+          $('beat').hidden = false;
+        }
         $('open-app').href = 'liftlab://try?w=' + params.get('w');
         $('workout').hidden = false;
       }
@@ -258,7 +266,9 @@
             return Array.isArray(l) && typeof l[1] === 'string' && typeof l[2] === 'number' && typeof l[3] === 'number';
           }).map(function (l) { return { name: l[1].slice(0, 60), sets: Math.round(l[2]), reps: Math.round(l[3]) }; });
           if (!lifts.length) return null;
-          return { title: (typeof raw[1] === 'string' && raw[1].trim().slice(0, 40)) || 'Shared workout', lifts: lifts };
+          var beat = Array.isArray(raw[3]) && typeof raw[3][0] === 'number' && raw[3][0] > 0 && (raw[3][1] === 'lb' || raw[3][1] === 'kg')
+            ? { volume: Math.min(Math.round(raw[3][0]), 10000000), units: raw[3][1] } : null;
+          return { title: (typeof raw[1] === 'string' && raw[1].trim().slice(0, 40)) || 'Shared workout', lifts: lifts, beat: beat };
         } catch (e) {
           return null;
         }

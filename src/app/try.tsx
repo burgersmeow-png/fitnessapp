@@ -12,6 +12,8 @@ import { useLinkCredit } from '../components/useLinkCredit';
 import { isSaved } from '../lib/savedWorkouts';
 import { decodeWorkoutLink, encodeWorkoutLink, planFromLink } from '../lib/workoutLink';
 import { forgetWorkout, keepWorkout, loadSaved } from '../services/savedWorkouts';
+import { armDare } from '../services/beat';
+import { convertVolume } from '../lib/beat';
 
 /** Opened from a shared workout link (liftlab://try?w=…). */
 export default function TryWorkoutScreen() {
@@ -46,7 +48,8 @@ export default function TryWorkoutScreen() {
   };
 
   const start = async () => {
-    await startWorkout(db, plan);
+    const id = await startWorkout(db, plan);
+    if (link.beat) await armDare(db, id, { title: link.title, target: link.beat, who: creator });
     router.replace('/workout');
   };
 
@@ -58,6 +61,18 @@ export default function TryWorkoutScreen() {
         {plan.length} {plan.length === 1 ? 'lift' : 'lifts'} · {plan.reduce((n, p) => n + p.sets, 0)} sets. Weights are picked from your own history.
       </Text>
 
+      {link.beat && (
+        <Card style={styles.dare}>
+          <Icon name="trophy" size={28} color={colors.warning} />
+          <View style={{ flex: 1, marginLeft: space.md }}>
+            <Text style={type.label}>{creator ? `${creator.toUpperCase()} DARES YOU` : 'CAN YOU BEAT IT?'}</Text>
+            <Text style={styles.target}>
+              {formatNumber(convertVolume(link.beat.volume, link.beat.units, units))} {units}
+            </Text>
+            <Text style={styles.meta}>Total volume to beat: weight × reps, every set added up.</Text>
+          </View>
+        </Card>
+      )}
       {plan.length > 0 && (
         <Button
           title={activeId == null ? 'Start this workout' : 'Back to your current workout'}
@@ -103,6 +118,8 @@ export default function TryWorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
+  dare: { flexDirection: 'row', alignItems: 'center', marginTop: space.md },
+  target: { color: colors.text, fontSize: 28, fontWeight: '900', marginTop: 2, fontVariant: ['tabular-nums'] },
   notNow: { alignSelf: 'center', marginBottom: space.md },
   notNowText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
   screen: { flex: 1, backgroundColor: colors.background },
