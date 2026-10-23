@@ -43,8 +43,8 @@ Everything is stored on the phone in SQLite, so it works offline.
 3. In a terminal:
 
    ```bash
-   git clone <this repo's URL>
-   cd liftlab
+   git clone https://github.com/burgersmeow-png/fitnessapp
+   cd fitnessapp
    npm install
    npx expo start --tunnel
    ```
