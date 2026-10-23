@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type Svg from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { CardContent } from '../lib/shareCard';
+import { withCreatorCode, type CardContent } from '../lib/shareCard';
+import { loadMyCode } from '../services/creatorCode';
 import { colors, radius, space, type } from '../lib/theme';
 import { shareCardImage } from '../services/shareImage';
 import { CARD_H, CARD_W, ShareCard } from './ShareCard';
@@ -24,6 +26,13 @@ export function ShareCardSheet({
   const { width, height } = useWindowDimensions();
   const ref = useRef<Svg>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // Creators who set their code in Settings get it on every card they post.
+  const db = useSQLiteContext();
+  const [myCode, setMyCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (content) loadMyCode(db).then(setMyCode).catch(() => {});
+  }, [db, content]);
+  const shown = content && withCreatorCode(content, myCode);
   // Fit the 9:16 card between the title and the buttons.
   const cardW = Math.min(width - 2 * space.xl, ((height - insets.top - insets.bottom - 220) * CARD_W) / CARD_H);
 
@@ -47,7 +56,7 @@ export function ShareCardSheet({
           </Pressable>
         </View>
         <View style={styles.cardWrap} nativeID="liftlab-share-card">
-          {content && <ShareCard ref={ref} content={content} width={cardW} />}
+          {shown && <ShareCard ref={ref} content={shown} width={cardW} />}
         </View>
         {status && <Text style={styles.status}>{status}</Text>}
         <Button title="Share image" onPress={share} style={{ marginHorizontal: space.md }} />
