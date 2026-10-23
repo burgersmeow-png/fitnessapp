@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CreatorCodeEntry } from '../components/CreatorCodeEntry';
@@ -24,6 +24,9 @@ import { PROGRAM_BY_ID } from '../lib/programs';
 import { colors, radius, space, type } from '../lib/theme';
 import type { Settings } from '../lib/types';
 import { startProgram } from '../services/programs';
+import { pinRoute, starterLabel, starterPin, type Pin } from '../lib/creatorFeed';
+import { loadCreator } from '../services/creatorCode';
+import { loadFeed } from '../services/creatorFeed';
 
 const STEPS = ['intro', 'goal', 'experience', 'days', 'equipment', 'body', 'plan'] as const;
 const LENGTHS = [30, 45, 60, 75];
@@ -41,7 +44,17 @@ export default function WelcomeScreen() {
   const [units, setUnits] = useState<Settings['units']>(() => unitsForLocale(Intl.DateTimeFormat().resolvedOptions().locale));
   const [weight, setWeight] = useState('');
   const [busy, setBusy] = useState(false);
+  // Someone who came from a creator starts with what that creator pinned.
+  const [creatorStart, setCreatorStart] = useState<{ name: string; code: string; pin: Pin } | null>(null);
   const name = STEPS[step];
+  useEffect(() => {
+    if (name !== 'plan') return;
+    (async () => {
+      const [creator, feed] = await Promise.all([loadCreator(db), loadFeed(db)]);
+      const pin = feed && starterPin(feed.pins);
+      setCreatorStart(creator && feed && pin ? { name: feed.name, code: creator.code, pin } : null);
+    })().catch(() => {});
+  }, [db, name]);
   const programId = main && experience && days ? recommendProgram(main, experience, days) : null;
   const program = programId ? PROGRAM_BY_ID.get(programId) : undefined;
 
@@ -51,7 +64,7 @@ export default function WelcomeScreen() {
     setStep((s) => Math.min(STEPS.length - 1, s + 1));
   };
 
-  const finish = async (withProgram: boolean, skip = false) => {
+  const finish = async (withProgram: boolean, skip = false, then?: Pin) => {
     if (busy) return;
     setBusy(true);
     const current = await loadSettings(db);
@@ -74,6 +87,10 @@ export default function WelcomeScreen() {
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.replace('/');
+    if (then && creatorStart) {
+      const to = pinRoute(then);
+      router.push({ ...to, params: { ...to.params, code: creatorStart.code } });
+    }
   };
 
   return (
@@ -209,7 +226,12 @@ export default function WelcomeScreen() {
 
       {name === 'plan' ? (
         <View style={styles.footer}>
-          <Button title={program ? `Start ${program.name}` : 'Start training'} onPress={() => finish(true)} />
+          {creatorStart && <Button title={starterLabel(creatorStart.name, creatorStart.pin)} onPress={() => finish(false, false, creatorStart.pin)} style={{ marginBottom: space.sm }} />}
+          <Button
+            title={program ? `Start ${program.name}` : 'Start training'}
+            onPress={() => finish(true)}
+            variant={creatorStart ? 'secondary' : 'primary'}
+          />
           <Pressable onPress={() => finish(false)} accessibilityRole="button" style={styles.secondary} hitSlop={8}>
             <Text style={styles.link}>Plan each day for me instead</Text>
           </Pressable>

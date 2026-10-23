@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cleanPins, feedStale, isNew, markSeen, mergeFeed, pinRoute, type Pin } from './creatorFeed';
+import { cleanPins, feedStale, starterLabel, starterPin, isNew, markSeen, mergeFeed, pinRoute, type Pin } from './creatorFeed';
 
 const w: Pin = { kind: 'w', payload: 'WzEsIkxlZyBkYXki', title: 'Leg day' };
 const p: Pin = { kind: 'p', payload: 'WzEsIlNwbGl0Il0x', title: 'Split' };
@@ -35,4 +35,14 @@ test('the server is asked at most hourly', () => {
   assert.equal(feedStale(null, now), true);
   assert.equal(feedStale(feed, new Date(now.getTime() + 30 * 60e3)), false);
   assert.equal(feedStale(feed, new Date(now.getTime() + 61 * 60e3)), true);
+});
+
+test('new followers start with the plan, then a workout, then a challenge', () => {
+  const c: Pin = { kind: 'c', payload: 'cccccccc', title: '12 in 4 weeks' };
+  assert.equal(starterPin([w, c, p]), p);
+  assert.equal(starterPin([c, w]), w);
+  assert.equal(starterPin([c]), c);
+  assert.equal(starterPin([]), null);
+  assert.equal(starterLabel('Alex', p), 'Follow Alex’s Split');
+  assert.equal(starterLabel('Alex', c), 'Join Alex’s 12 in 4 weeks');
 });
