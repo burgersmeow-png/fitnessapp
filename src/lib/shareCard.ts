@@ -23,6 +23,13 @@ export interface CardContent {
   lines: { name: string; detail: string; pr: boolean }[];
   more: number;
   footer: string;
+  /** A creator's own code, shown in place of the footer so every post can bring sign-ups. */
+  code?: string;
+}
+
+/** The card as a creator posts it: their code where the footer was. */
+export function withCreatorCode(content: CardContent, code: string | null): CardContent {
+  return code ? { ...content, code, footer: `Use code ${code} on LiftLab` } : content;
 }
 
 export const MAX_LINES = 5;

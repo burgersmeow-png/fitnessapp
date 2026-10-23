@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { badgeCardContent, cardContent, compactNumber, prCardContent, planCardContent, streakCardContent, workoutCardContent, type CardInput } from './shareCard';
+import { badgeCardContent, cardContent, compactNumber, prCardContent, planCardContent, streakCardContent, withCreatorCode, workoutCardContent, type CardInput } from './shareCard';
 
 const base: CardInput = {
   startedAt: new Date(2026, 9, 23, 7).toISOString(),
@@ -98,4 +98,12 @@ test('a plan card lists its days in order', () => {
   assert.equal(c.headline, '4-DAY SPLIT');
   assert.deepEqual(c.stats.map((s) => s.value), ['2', '6', '9']);
   assert.deepEqual(c.lines[0], { name: 'Day 1 · Upper A', detail: 'Bench, Row, Press +1', pr: false });
+});
+
+test('a creator’s cards carry their code', () => {
+  const c = workoutCardContent({ title: 'Leg day', lifts: [{ id: 'squat', name: 'Squat', sets: 3, reps: 5, rest: 120 }] });
+  assert.equal(withCreatorCode(c, null), c);
+  const coded = withCreatorCode(c, 'ALEX10');
+  assert.equal(coded.footer, 'Use code ALEX10 on LiftLab');
+  assert.equal(coded.code, 'ALEX10');
 });

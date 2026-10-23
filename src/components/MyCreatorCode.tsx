@@ -36,13 +36,13 @@ export function MyCreatorCode() {
     await saveMyCode(db, code);
     setSaved(code);
     setText(code);
-    setNote(`Saved. Links you share now end in &code=${code}.`);
+    setNote(`Saved. Links and story cards you share now carry ${code}.`);
   };
 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Are you a creator?</Text>
-      <Text style={styles.meta}>Add your code and it goes on every workout, plan and challenge link you share, so sign-ups count for you.</Text>
+      <Text style={styles.meta}>Add your code and it goes on every link and story card you share, so sign-ups count for you.</Text>
       <View style={styles.row}>
         <TextInput
           value={text}

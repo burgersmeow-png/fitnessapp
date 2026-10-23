@@ -77,7 +77,9 @@ export const ShareCard = forwardRef<Svg, { content: CardContent; width: number }
       )}
 
       <Rect x={X} y={1750} width={CARD_W - 2 * X} height={2} fill={colors.border} />
-      <Text x={X} y={1830} fontSize={36} fontWeight="600" fill={colors.textMuted} fontFamily={FONT}>{content.footer}</Text>
+      <Text x={X} y={1830} fontSize={content.code ? 44 : 36} fontWeight={content.code ? '900' : '600'} fill={content.code ? colors.accent : colors.textMuted} fontFamily={FONT}>
+        {content.footer}
+      </Text>
     </Svg>
   );
 });
