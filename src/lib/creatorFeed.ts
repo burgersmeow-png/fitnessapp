@@ -61,3 +61,13 @@ export function mergeFeed(prev: CreatorFeed | null, name: string, pins: Pin[], n
 
 export const markSeen = (feed: CreatorFeed, pin: Pin): CreatorFeed =>
   feed.seen.includes(pin.payload) ? feed : { ...feed, seen: [...feed.seen, pin.payload] };
+
+/** What a new follower should start with: the creator's plan if they pinned one, else a workout, else a challenge. */
+export function starterPin(pins: Pin[]): Pin | null {
+  return pins.find((p) => p.kind === 'p') ?? pins.find((p) => p.kind === 'w') ?? pins.find((p) => p.kind === 'c') ?? null;
+}
+
+export function starterLabel(name: string, pin: Pin): string {
+  const verb = { p: 'Follow', w: 'Start', c: 'Join' }[pin.kind];
+  return `${verb} ${name}’s ${pin.title}`;
+}
