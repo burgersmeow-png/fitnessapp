@@ -240,3 +240,24 @@ test('challenge leaderboard rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL a
   assert.equal((await bob.c.from('challenge_entries').select().eq('user_id', ann.id)).data.length, 0);
   for (const u of [ann, bob, eve]) await u.c.rpc('delete_account');
 });
+
+test('backup rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_ANON_KEY' }, async () => {
+  const ann = await user('backann');
+  const bob = await user('backbob');
+  const save = (u, workouts) =>
+    u.c.from('backups').upsert({ user_id: u.id, data: { v: 1, tables: { workouts } }, summary: { workouts: workouts.length }, updated_at: new Date().toISOString() });
+  assert.ifError((await save(ann, [{ id: 1 }])).error);
+  assert.ifError((await save(ann, [{ id: 1 }, { id: 2 }])).error);
+  const mine = await ann.c.from('backups').select().single();
+  assert.equal(mine.data.summary.workouts, 2);
+  // Nobody else can read, overwrite or delete it.
+  assert.equal((await bob.c.from('backups').select().eq('user_id', ann.id)).data.length, 0);
+  assert.ok((await bob.c.from('backups').insert({ user_id: ann.id, data: {}, summary: {} })).error);
+  await bob.c.from('backups').update({ data: {} }).eq('user_id', ann.id);
+  await bob.c.from('backups').delete().eq('user_id', ann.id);
+  assert.equal((await ann.c.from('backups').select().single()).data.summary.workouts, 2);
+  // Signed out, nothing at all.
+  const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  assert.equal((await anon.from('backups').select()).data?.length ?? 0, 0);
+  for (const u of [ann, bob]) await u.c.rpc('delete_account');
+});

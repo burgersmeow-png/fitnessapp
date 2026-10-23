@@ -7,6 +7,8 @@ import { stravaEnabled } from '../../services/strava';
 import { socialConfigured } from '../../services/supabase';
 import { Button, Chip, SectionLabel, Loading } from '../../components/ui';
 import { exportTrainingLog } from '../../services/exportLog';
+import { backupAvailable } from '../../services/backup';
+import { BackupCard } from '../../components/BackupCard';
 import { CreatorCodeEntry } from '../../components/CreatorCodeEntry';
 import { MyCreatorCode } from '../../components/MyCreatorCode';
 import { creatorCodesAvailable } from '../../services/creatorCode';
@@ -251,6 +253,11 @@ export default function SettingsScreen() {
         </>
       )}
       <SectionLabel>Your data</SectionLabel>
+      {backupAvailable && (
+        <View style={{ marginBottom: space.lg }}>
+          <BackupCard onRestored={reload} />
+        </View>
+      )}
       <Button
         title="Export training log (CSV)"
         variant="secondary"
