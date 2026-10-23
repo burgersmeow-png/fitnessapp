@@ -2,7 +2,7 @@
 // it active after their first workout. No sign-in needed, since most people never make an account.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readJson, send } from './http';
-import { parseClaim, rateLimiter, validCode, validInstall } from './referralRules';
+import { dailyCounts, parseClaim, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
 import { admin, databaseConfigured } from './supabase';
 
 export const referralsConfigured = databaseConfigured;
@@ -45,6 +45,30 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       const { error } = await admin().from('referrals').update({ active_at: new Date().toISOString() }).eq('install_id', installId).is('active_at', null);
       if (error) throw error;
       return send(res, 200, { ok: true }), true;
+    }
+    if (req.method === 'POST' && url.pathname === '/ref/stats') {
+      // The creator's private dashboard. POST so the secret stays out of URLs and logs.
+      const ask = parseStatsRequest(await readJson(req, 256));
+      const denied = () => send(res, 403, { error: 'That dashboard link isn’t valid. Ask for a new one.' });
+      if (!ask) return denied(), true;
+      const { data: c } = await admin().from('creator_codes').select('code, creator_name, stats_token').eq('code', ask.code).maybeSingle();
+      if (!c || !tokensMatch(c.stats_token, ask.token)) return denied(), true;
+      const [{ data: stats }, { data: recent }] = await Promise.all([
+        admin().from('creator_stats').select('signups, active_users, signups_last_7_days').eq('code', ask.code).single(),
+        admin()
+          .from('referrals')
+          .select('created_at')
+          .eq('code', ask.code)
+          .gte('created_at', new Date(Date.now() - 14 * 864e5).toISOString()),
+      ]);
+      return send(res, 200, {
+        code: c.code,
+        creatorName: c.creator_name,
+        signups: stats?.signups ?? 0,
+        activeUsers: stats?.active_users ?? 0,
+        signupsLast7Days: stats?.signups_last_7_days ?? 0,
+        daily: dailyCounts((recent ?? []).map((r: { created_at: string }) => r.created_at), new Date()),
+      }), true;
     }
     return send(res, 404, { error: 'Not found' }), true;
   } catch (e) {

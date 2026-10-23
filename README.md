@@ -200,6 +200,21 @@ Each install that uses a code counts as one sign-up for that creator, and as an 
 
 The helper server needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and the app needs `EXPO_PUBLIC_SERVER_URL`. The code tables are invisible to the app itself, and the server limits each address to 20 code checks a minute so codes can't be guessed. The `perk` column is there for a future reward (like a free month) if the app ever adds a paid tier.
 
+
+### Creator dashboard
+
+Each creator gets a private page, `site/creator.html`, with their sign-ups, active users and a 14-day
+chart. The link carries a secret token after the `#`, so it never reaches any server log. To make each
+creator's link, run this in the Supabase SQL editor (after the `creator_stats_token` migration):
+
+```sql
+select code, 'https://burgersmeow-png.github.io/fitnessapp/creator.html#code=' || code || '&token=' || stats_token
+from creator_codes;
+```
+
+The page needs `serverUrl` set in `site/config.js`. To cut off a link, give that creator a new token
+(see the migration file).
+
 ## Strava (switched off for now)
 
 The code to import runs, rides and swims from Strava and to post lifting sessions to Strava is in the
