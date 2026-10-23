@@ -2,7 +2,7 @@
 // it active after their first workout. No sign-in needed, since most people never make an account.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readJson, send } from './http';
-import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePinsRequest, parsePushRequest, pinAlert, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
+import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePinsRequest, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
 import { admin, databaseConfigured } from './supabase';
 import type { Pin } from './referralRules';
 
@@ -76,6 +76,20 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       if (error) throw error;
       return send(res, 200, { ok: true }), true;
     }
+    if (req.method === 'POST' && url.pathname === '/ref/used') {
+      // A credited follower started one of their creator's pins. Anything not pinned is ignored.
+      const ask = parseUseRequest(await readJson(req, 6000));
+      if (!ask) return send(res, 400, { error: 'Bad request' }), true;
+      const { data: ref } = await admin().from('referrals').select('code').eq('install_id', ask.installId).maybeSingle();
+      const found = ref ? await lookup(ref.code) : null;
+      if (found && (found.pins ?? []).some((p) => p.payload === ask.payload)) {
+        const { error } = await admin()
+          .from('creator_pin_uses')
+          .upsert({ code: found.code, pin_hash: pinHash(ask.payload), install_id: ask.installId }, { onConflict: 'code,pin_hash,install_id', ignoreDuplicates: true });
+        if (error) throw error;
+      }
+      return send(res, 200, { ok: true }), true;
+    }
     if (req.method === 'POST' && url.pathname === '/ref/claim') {
       const claim = parseClaim(await readJson(req, 512));
       if (!claim) return send(res, 400, { error: 'Bad request' }), true;
@@ -102,7 +116,7 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       const { data: c } = await admin().from('creator_codes').select('code, creator_name, stats_token, pins').eq('code', ask.code).maybeSingle();
       if (!c || !tokensMatch(c.stats_token, ask.token)) return denied(), true;
       const since = new Date(Date.now() - 14 * 864e5).toISOString();
-      const [{ data: stats }, { data: recent }, { data: opens }] = await Promise.all([
+      const [{ data: stats }, { data: recent }, { data: opens }, { data: uses }] = await Promise.all([
         admin().from('creator_stats').select('signups, active_users, signups_last_7_days').eq('code', ask.code).single(),
         admin()
           .from('referrals')
@@ -110,6 +124,7 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
           .eq('code', ask.code)
           .gte('created_at', since),
         admin().from('creator_link_opens').select('day, opens').eq('code', ask.code).gte('day', since.slice(0, 10)),
+        admin().from('creator_pin_uses').select('pin_hash').eq('code', ask.code),
       ]);
       return send(res, 200, {
         code: c.code,
@@ -117,7 +132,7 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
         signups: stats?.signups ?? 0,
         activeUsers: stats?.active_users ?? 0,
         signupsLast7Days: stats?.signups_last_7_days ?? 0,
-        pins: c.pins ?? [],
+        pins: pinsWithUses((c.pins ?? []) as Pin[], (uses ?? []) as { pin_hash: string }[]),
         dailyOpens: dailyOpens((opens ?? []) as { day: string; opens: number }[], new Date()),
         daily: dailyCounts((recent ?? []).map((r: { created_at: string }) => r.created_at), new Date()),
       }), true;

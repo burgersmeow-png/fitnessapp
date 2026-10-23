@@ -13,6 +13,7 @@ import { isSaved } from '../lib/savedWorkouts';
 import { decodeWorkoutLink, encodeWorkoutLink, planFromLink } from '../lib/workoutLink';
 import { forgetWorkout, keepWorkout, loadSaved } from '../services/savedWorkouts';
 import { armDare } from '../services/beat';
+import { reportPinUse } from '../services/creatorCode';
 import { convertVolume } from '../lib/beat';
 
 /** Opened from a shared workout link (liftlab://try?w=…). */
@@ -50,6 +51,7 @@ export default function TryWorkoutScreen() {
   const start = async () => {
     const id = await startWorkout(db, plan);
     if (link.beat) await armDare(db, id, { title: link.title, target: link.beat, who: creator });
+    reportPinUse(db, w).catch(() => {});
     router.replace('/workout');
   };
 

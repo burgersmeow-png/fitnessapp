@@ -12,6 +12,7 @@ import type { CardContent } from '../lib/shareCard';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { joinChallenge, leaveChallenge, loadChallenge } from '../services/challenge';
+import { reportPinUse } from '../services/creatorCode';
 import { loadBoard, syncChallengeEntry, type Board } from '../services/challengeBoard';
 import { loadSessionDates } from '../services/habits';
 import { linkWithMyCode } from '../services/creatorCode';
@@ -47,6 +48,7 @@ export default function ChallengeScreen() {
   const join = (def: ChallengeDef) => {
     const run = async () => {
       await joinChallenge(db, def);
+      if (invite && def === invite) reportPinUse(db, c).catch(() => {});
       await syncChallengeEntry(db).catch(() => {});
       if (invite) router.setParams({ c: undefined });
       reload();

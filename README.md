@@ -236,6 +236,8 @@ After the `creator_link_opens` migration, the dashboard also counts how often ea
 After the `creator_push` migration, followers can tap "Tell me when Alex posts" on Today; when the
 creator pins something new, the server sends them a push alert (at most one every 12 hours per
 creator). Push needs the EAS project id, like coach alerts.
+After the `creator_pin_uses` migration, the dashboard also shows how many followers started each
+pinned workout, followed each plan or joined each challenge.
 
 ## Strava (switched off for now)
 
