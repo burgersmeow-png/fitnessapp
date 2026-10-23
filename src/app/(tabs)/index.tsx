@@ -36,6 +36,7 @@ import { challengeProgress, type ChallengeProgress, type JoinedChallenge } from 
 import { syncRecapNudge, syncReminders } from '../../services/reminders';
 import { loadGyms, saveGyms } from '../../services/gyms';
 import { loadPrefs } from '../../services/exercisePrefs';
+import { autoBackup } from '../../services/backup';
 import { switchGym, type Gyms } from '../../lib/gyms';
 import { syncStravaIfDue } from '../../services/strava';
 
@@ -113,6 +114,7 @@ export default function TodayScreen() {
   useEffect(() => {
     syncStravaIfDue(db).then((added) => added > 0 && reload());
     flushCreator(db).catch(() => {});
+    autoBackup(db);
   }, [db, reload]);
 
   if (!data) return <Loading />;

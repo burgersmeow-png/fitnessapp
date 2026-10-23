@@ -109,6 +109,14 @@ The anon key is safe to ship in the app: the database's row level security decid
 see. Never put the **service_role** (secret) key in the app. Free projects pause after a week with no use;
 press **Restore** in the Supabase dashboard to wake one up.
 
+### Cloud backup
+
+After the `backups` migration (`supabase/migrations/20261023130000_backups.sql`), Settings → Your data
+offers **Back up now** to anyone signed in. It uploads the training log (workouts, cardio, food, body weight
+and measurements, settings) to that person's own row, which only they can read. Once someone has backed up,
+the app backs up again each day it's opened. On a new phone, sign in and tap **Restore your backup**.
+Progress photos are never uploaded.
+
 To check the privacy rules against a test project:
 `SUPABASE_URL=... SUPABASE_ANON_KEY=... npm run test:social` (it creates and deletes throwaway accounts).
 
