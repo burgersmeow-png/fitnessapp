@@ -229,6 +229,9 @@ from creator_codes;
 The page needs `serverUrl` set in `site/config.js`. To cut off a link, give that creator a new token
 (see the migration file).
 
+Creators can also pin up to 6 workout, plan or challenge links on the dashboard (after the
+`creator_pins` migration). Followers who open the creator's link (`?code=ALEX10`) see them listed.
+
 ## Strava (switched off for now)
 
 The code to import runs, rides and swims from Strava and to post lifting sessions to Strava is in the

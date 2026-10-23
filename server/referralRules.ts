@@ -59,3 +59,47 @@ export function dailyCounts(createdAt: string[], now: Date, days = 14): { day: s
   }
   return out;
 }
+
+export interface Pin {
+  /** w = workout, p = plan, c = challenge: the same letters the links use. */
+  kind: 'w' | 'p' | 'c';
+  payload: string;
+  title: string;
+}
+
+export const MAX_PINS = 6;
+const DEFAULT_TITLE = { w: 'Workout', p: 'Training plan', c: 'Challenge' } as const;
+
+/** A workout, plan or challenge link pasted by a creator, as a pin. null if it isn't one. */
+export function pinFromLink(link: unknown): Pin | null {
+  if (typeof link !== 'string' || link.length > 6000) return null;
+  const m = link.match(/[?&#]([wpc])=([A-Za-z0-9_-]{8,5000})(?=$|[&#\s])/);
+  if (!m) return null;
+  const kind = m[1] as Pin['kind'];
+  let raw: unknown;
+  try {
+    raw = JSON.parse(Buffer.from(m[2], 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(raw) || raw[0] !== 1) return null;
+  const title = typeof raw[1] === 'string' ? raw[1].replace(/[\u0000-\u001f]/g, '').trim().slice(0, 40) : '';
+  return { kind, payload: m[2], title: title || DEFAULT_TITLE[kind] };
+}
+
+/** The dashboard's "save my page" request. Blank lines are skipped; any bad link fails the lot. */
+export function parsePinsRequest(body: unknown): { code: string; token: string; pins: Pin[]; bad: number[] } | null {
+  const auth = parseStatsRequest(body);
+  const links = (body as { links?: unknown } | null)?.links;
+  if (!auth || !Array.isArray(links) || links.length > 50) return null;
+  const filled = links.map((l, i) => [l, i] as const).filter(([l]) => typeof l === 'string' && l.trim() !== '');
+  const pins: Pin[] = [];
+  const bad: number[] = [];
+  for (const [l, i] of filled) {
+    const pin = pinFromLink((l as string).trim());
+    if (pin) pins.push(pin);
+    else bad.push(i);
+  }
+  if (pins.length > MAX_PINS) return null;
+  return { ...auth, pins, bad };
+}

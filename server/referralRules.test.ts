@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dailyCounts, parseClaim, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
+import { dailyCounts, parseClaim, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
 
 test('claims need a real code and install id', () => {
   const installId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -41,4 +41,29 @@ test('daily sign-ups fill in empty days', () => {
     { day: '2026-10-22', count: 0 },
     { day: '2026-10-23', count: 2 },
   ]);
+});
+
+const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString('base64url');
+const workout = b64([1, 'Leg day', [['back-squat', 'Back squat', 3, 5, 180]], [12400, 'lb']]);
+const plan = b64([1, '', [['Day A', []]]]);
+
+test('pins come from pasted workout, plan and challenge links', () => {
+  assert.deepEqual(pinFromLink(`https://x.github.io/fitnessapp/?w=${workout}&code=ALEX10`), { kind: 'w', payload: workout, title: 'Leg day' });
+  assert.deepEqual(pinFromLink(`liftlab://plan?p=${plan}`), { kind: 'p', payload: plan, title: 'Training plan' });
+  assert.equal(pinFromLink(`https://x/?c=${b64([1, 'Ten in a row', 10, 14])}`)?.title, 'Ten in a row');
+  assert.equal(pinFromLink('https://x/?code=ALEX10'), null);
+  assert.equal(pinFromLink(`https://x/?w=${b64([2, 'Future'])}`), null);
+  assert.equal(pinFromLink(`https://x/?w=${b64({ evil: true })}`), null);
+  assert.equal(pinFromLink(`https://x/?w=${workout}<script>`), null);
+  assert.equal(pinFromLink(42), null);
+});
+
+test('a save request needs the dashboard secret and at most 6 good links', () => {
+  const auth = { code: 'ALEX10', token: 'a'.repeat(32) };
+  const ok = parsePinsRequest({ ...auth, links: [`?w=${workout}`, '  ', 'not a link', `?p=${plan}`] });
+  assert.deepEqual(ok?.pins.map((p) => p.kind), ['w', 'p']);
+  assert.deepEqual(ok?.bad, [2]);
+  assert.equal(parsePinsRequest({ ...auth, links: Array(7).fill(`?w=${workout}`) }), null);
+  assert.equal(parsePinsRequest({ code: 'ALEX10', token: 'nope', links: [] }), null);
+  assert.deepEqual(parsePinsRequest({ ...auth, links: [] })?.pins, []);
 });
