@@ -11,6 +11,7 @@ import { GoalCard } from '../../components/GoalCard';
 import { Icon, type IconName } from '../../components/Icon';
 import { SectionLabel, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, cardioFatigue, type CardioSession } from '../../lib/cardio';
+import { flushCreator } from '../../services/creatorCode';
 import { activeWorkoutId, loadCardio, loadExercises, loadFoodForDay, loadHistory, loadSettings, startWorkout } from '../../lib/db';
 import { dailyTargets, sumMacros, type Macros } from '../../lib/nutrition';
 import { formatNumber, MUSCLE_LABELS } from '../../lib/format';
@@ -85,6 +86,7 @@ export default function TodayScreen() {
   // New Strava activities change recovery, so re-plan once they are in.
   useEffect(() => {
     syncStravaIfDue(db).then((added) => added > 0 && reload());
+    flushCreator(db).catch(() => {});
   }, [db, reload]);
 
   if (!data) return <Loading />;

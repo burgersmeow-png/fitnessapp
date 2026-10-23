@@ -1,0 +1,54 @@
+// Creator codes: check a code a follower typed, record their install for the creator, and mark
+// it active after their first workout. No sign-in needed, since most people never make an account.
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { readJson, send } from './http';
+import { parseClaim, rateLimiter, validCode, validInstall } from './referralRules';
+import { admin, databaseConfigured } from './supabase';
+
+export const referralsConfigured = databaseConfigured;
+
+const allow = rateLimiter(20, 60_000);
+const ipOf = (req: IncomingMessage) => (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim() ?? req.socket.remoteAddress ?? '?';
+
+async function lookup(code: string) {
+  const { data } = await admin().from('creator_codes').select('code, creator_name, welcome').eq('code', code).eq('active', true).maybeSingle();
+  return data as { code: string; creator_name: string; welcome: string | null } | null;
+}
+
+/** Routes /ref/*. Returns false when the path isn't a referral route. */
+export async function handleReferrals(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const url = new URL(req.url ?? '/', 'http://x');
+  if (!url.pathname.startsWith('/ref/')) return false;
+  if (!referralsConfigured()) return send(res, 503, { error: 'Creator codes aren’t set up on the server yet.' }), true;
+  if (!allow(ipOf(req))) return send(res, 429, { error: 'Too many tries. Wait a minute and try again.' }), true;
+  try {
+    if (req.method === 'GET' && url.pathname === '/ref/check') {
+      const code = url.searchParams.get('code');
+      const found = validCode(code) ? await lookup(code!) : null;
+      if (!found) return send(res, 404, { error: 'That code isn’t valid. Check the spelling with your creator.' }), true;
+      return send(res, 200, { code: found.code, creatorName: found.creator_name, welcome: found.welcome }), true;
+    }
+    if (req.method === 'POST' && url.pathname === '/ref/claim') {
+      const claim = parseClaim(await readJson(req, 512));
+      if (!claim) return send(res, 400, { error: 'Bad request' }), true;
+      if (!(await lookup(claim.code))) return send(res, 404, { error: 'That code isn’t valid.' }), true;
+      // One install, one creator: the first code entered keeps the credit.
+      const { error } = await admin()
+        .from('referrals')
+        .upsert({ install_id: claim.installId, code: claim.code }, { onConflict: 'install_id', ignoreDuplicates: true });
+      if (error) throw error;
+      return send(res, 200, { ok: true }), true;
+    }
+    if (req.method === 'POST' && url.pathname === '/ref/active') {
+      const { installId } = ((await readJson(req, 256)) ?? {}) as { installId?: unknown };
+      if (!validInstall(installId)) return send(res, 400, { error: 'Bad request' }), true;
+      const { error } = await admin().from('referrals').update({ active_at: new Date().toISOString() }).eq('install_id', installId).is('active_at', null);
+      if (error) throw error;
+      return send(res, 200, { ok: true }), true;
+    }
+    return send(res, 404, { error: 'Not found' }), true;
+  } catch (e) {
+    console.error('referrals', e);
+    return send(res, 500, { error: 'Something went wrong. Try again.' }), true;
+  }
+}

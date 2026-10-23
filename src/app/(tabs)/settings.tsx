@@ -7,6 +7,8 @@ import { stravaEnabled } from '../../services/strava';
 import { socialConfigured } from '../../services/supabase';
 import { Button, Chip, SectionLabel, Loading } from '../../components/ui';
 import { exportTrainingLog } from '../../services/exportLog';
+import { CreatorCodeEntry } from '../../components/CreatorCodeEntry';
+import { creatorCodesAvailable } from '../../services/creatorCode';
 import { fromKg, loadSettings, saveSettings, toKg } from '../../lib/db';
 import { formatTime } from '../../lib/habits';
 import { dailyTargets } from '../../lib/nutrition';
@@ -176,6 +178,12 @@ export default function SettingsScreen() {
         </>
       )}
       <Text style={[styles.note, { marginTop: space.md }]}>Today's plan updates as soon as you change these.</Text>
+      {creatorCodesAvailable() && (
+        <>
+          <SectionLabel>Creator code</SectionLabel>
+          <CreatorCodeEntry startOpen />
+        </>
+      )}
       <SectionLabel>Your data</SectionLabel>
       <Button
         title="Export training log (CSV)"

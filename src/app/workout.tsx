@@ -41,6 +41,7 @@ import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
 import { finishAssignedWorkout } from '../services/coaching';
 import { finishProgramWorkout } from '../services/programs';
+import { flushCreator } from '../services/creatorCode';
 import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habits';
 import { goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/habits';
 import { sharePost } from '../services/social';
@@ -353,6 +354,7 @@ export default function WorkoutScreen() {
       saveRecord(db, `superset:${workoutId}`, null);
       if (finished.length > 0) finishAssignedWorkout(db, workoutId!).catch(() => {});
       if (finished.length > 0) await finishProgramWorkout(db, workoutId!);
+      if (finished.length > 0) flushCreator(db).catch(() => {});
       skipRest();
       if (finished.length === 0) {
         close();

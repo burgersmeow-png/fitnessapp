@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CreatorCodeEntry } from '../components/CreatorCodeEntry';
 import { Icon } from '../components/Icon';
 import { Button, Chip } from '../components/ui';
 import { loadSettings, logBodyWeight, saveSettings } from '../lib/db';
@@ -113,7 +114,10 @@ export default function WelcomeScreen() {
                 <Text style={type.body}>{text}</Text>
               </View>
             ))}
-            <Text style={[styles.muted, { marginTop: space.lg }]}>Five quick questions. Everything stays on your phone.</Text>
+            <Text style={[styles.muted, { marginTop: space.lg }]}>Five quick questions. Your workouts stay on your phone.</Text>
+            <View style={{ marginTop: space.lg }}>
+              <CreatorCodeEntry />
+            </View>
           </View>
         )}
 

@@ -159,6 +159,23 @@ or a coach removing a client, stops the subscription straight away. App Store no
 payment outside in-app purchase for real person-to-person services such as personal training, but
 review decides, so describe the coaching clearly when you submit.
 
+## Creator codes (influencer promotion)
+
+Each creator gets a code like `ALEX10`. Followers type it on the first screen of the app (or later in Settings), or tap the creator's link, which fills it in for them: `https://your-app-link/?code=ALEX10`. The app shows "Welcome from Alex" with the creator's own message.
+
+Each install that uses a code counts as one sign-up for that creator, and as an active user once it finishes a workout, so you can pay creators for real users rather than downloads. No account is needed. The code and a random install id go to the helper server; workouts stay on the phone.
+
+1. Apply `supabase/migrations/20261023040000_creator_codes.sql` (Supabase dashboard, SQL editor).
+2. Add a creator:
+   ```sql
+   insert into creator_codes (code, creator_name, welcome)
+   values ('ALEX10', 'Alex', 'Alex''s 12-week plan is ready. Let''s get you strong.');
+   ```
+   Codes are 3 to 20 capital letters and numbers. To retire one: `update creator_codes set active = false where code = 'ALEX10';`
+3. See results any time: `select * from creator_stats;` (sign-ups, active users, sign-ups in the last 7 days).
+
+The helper server needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and the app needs `EXPO_PUBLIC_SERVER_URL`. The code tables are invisible to the app itself, and the server limits each address to 20 code checks a minute so codes can't be guessed. The `perk` column is there for a future reward (like a free month) if the app ever adds a paid tier.
+
 ## Strava (switched off for now)
 
 The code to import runs, rides and swims from Strava and to post lifting sessions to Strava is in the
@@ -211,6 +228,7 @@ Code layout:
 - `src/lib/measurements.ts` tape measurements per body part (`src/components/Measurements.tsx` on Progress)
 - `src/lib/records.ts` best set per lift and PR history (`src/app/records.tsx`)
 - `src/lib/restTimes.ts` your own rest time per lift, remembered (`src/components/workout/RestControl.tsx`)
+- `src/lib/creatorCode.ts` creator codes from influencers (`src/components/CreatorCodeEntry.tsx`, `server/referrals.ts`)
 - `src/lib/shareCard.ts` story-sized share card content (`src/components/ShareCard.tsx`, `src/services/shareImage.ts`)
 - `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
 - `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
