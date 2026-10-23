@@ -50,8 +50,8 @@ To preview in a browser instead, press `w` after `npx expo start`.
 
 ## Photo food estimates
 
-Photos are estimated by Claude through a small server in `server/food-ai.ts`, so no AI key ever ships
-inside the app. Each photo costs roughly one to two US cents in API usage.
+Photos are estimated by Claude through the app's small helper server (`server/`), so no AI key ever
+ships inside the app. Each photo costs roughly one to two US cents in API usage.
 
 To try it on your own phone:
 
@@ -60,20 +60,39 @@ To try it on your own phone:
 
    ```powershell
    $env:ANTHROPIC_API_KEY = "sk-ant-..."
-   npm run food-server
+   npm run server
    ```
 
 3. Find your PC's Wi-Fi address with `ipconfig` (the IPv4 address, for example `192.168.1.20`) and create
    a file named `.env.local` in the project folder containing:
 
    ```
-   EXPO_PUBLIC_FOOD_AI_URL=http://192.168.1.20:8787
+   EXPO_PUBLIC_SERVER_URL=http://192.168.1.20:8787
    ```
 
 4. Restart `npx expo start` (with the phone on the same Wi-Fi). "Snap a meal" now works.
 
 Searching foods and adding them by hand work without any of this. For the App Store, the same server runs
 on a host (for example Cloudflare, Render or Fly.io) and the URL points there.
+
+## Strava (switched off for now)
+
+The code to import runs, rides and swims from Strava and to post lifting sessions to Strava is in the
+app, but hidden. Since June 2026 Strava requires a paid Strava subscription on the developer's account
+to create an API app. To switch it on later:
+
+1. Create an app at [strava.com/settings/api](https://www.strava.com/settings/api). Set
+   **Authorization Callback Domain** to your PC's IPv4 address (from `ipconfig`).
+2. Start the server with the app's Client ID and Client Secret (PowerShell):
+
+   ```powershell
+   $env:STRAVA_CLIENT_ID = "12345"
+   $env:STRAVA_CLIENT_SECRET = "..."
+   npm run server
+   ```
+
+3. Add `EXPO_PUBLIC_STRAVA_ENABLED=1` to `.env.local`, restart `npx expo start`, and use
+   **Settings → Connect with Strava**.
 
 ## Development
 
@@ -91,7 +110,8 @@ Code layout:
 - `src/lib/cardio.ts` cardio types and how they load each muscle
 - `src/lib/voice.ts` understands spoken coach commands (offline)
 - `src/lib/nutrition.ts` calorie and macro targets, totals, photo-estimate checks, common foods
-- `server/food-ai.ts` the photo estimate server (Claude), with its prompt in `src/lib/foodPrompt.ts`
+- `server/` the helper server: meal photo estimates (Claude, prompt in `src/lib/foodPrompt.ts`) and Strava sign-in
+- `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting
 - `src/components/BodyMap.tsx` the front and back body illustration
 - `src/lib/db.ts` SQLite schema and queries
 - `src/lib/exercises.ts` built-in exercise library
@@ -100,5 +120,5 @@ Code layout:
 ## Next
 
 See the plan doc for the full roadmap: Apple Health and Watch, programs, barcode scanning,
-Strava and Garmin, always-on voice listening, social features and trainer mode. HealthKit and the Watch
+Garmin, always-on voice listening, social features and trainer mode. HealthKit and the Watch
 app need a development build through EAS and a paid Apple Developer account.

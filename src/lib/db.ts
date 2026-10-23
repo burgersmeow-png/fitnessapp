@@ -6,7 +6,7 @@ import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export const DATABASE_NAME = 'liftlab.db';
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 /*
  * Units: weights are stored in kilograms and distances in kilometres. They are
@@ -102,6 +102,13 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
         source TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS food_eaten ON food(eaten_at);
+    `);
+  }
+  if (version < 5) {
+    // Where an imported session came from (e.g. "strava:123"), so a sync never adds it twice.
+    await db.execAsync(`
+      ALTER TABLE cardio ADD COLUMN source_id TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS cardio_source ON cardio(source_id);
     `);
   }
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -315,10 +322,25 @@ export async function saveCardio(db: SQLiteDatabase, c: CardioSession): Promise<
   );
 }
 
+/** Saves imported sessions (distance in km), skipping ones already saved. Returns how many were new. */
+export async function importCardio(db: SQLiteDatabase, sessions: (CardioSession & { sourceId: string })[]): Promise<number> {
+  let added = 0;
+  await db.withTransactionAsync(async () => {
+    for (const c of sessions) {
+      const r = await db.runAsync(
+        'INSERT OR IGNORE INTO cardio (type, started_at, minutes, distance, rpe, source_id) VALUES (?, ?, ?, ?, ?, ?)',
+        c.type, c.startedAt, c.minutes, c.distance, c.rpe, c.sourceId,
+      );
+      added += r.changes;
+    }
+  });
+  return added;
+}
+
 /** Cardio sessions, newest first. `sinceDays` limits how far back to look. */
 export async function loadCardio(db: SQLiteDatabase, sinceDays?: number): Promise<CardioSession[]> {
   const since = sinceDays ? new Date(Date.now() - sinceDays * 864e5).toISOString() : '';
-  const rows = await db.getAllAsync<{ id: number; type: string; started_at: string; minutes: number; distance: number | null; rpe: number }>(
+  const rows = await db.getAllAsync<{ id: number; type: string; started_at: string; minutes: number; distance: number | null; rpe: number; source_id: string | null }>(
     'SELECT * FROM cardio WHERE started_at >= ? ORDER BY started_at DESC',
     since,
   );
@@ -329,7 +351,25 @@ export async function loadCardio(db: SQLiteDatabase, sinceDays?: number): Promis
     minutes: r.minutes,
     distance: fromKm(r.distance),
     rpe: r.rpe,
+    source: r.source_id ? r.source_id.split(':')[0] : null,
   }));
+}
+
+/** Small app records kept beside the settings, such as the Strava sign-in. */
+export async function loadRecord<T>(db: SQLiteDatabase, key: string): Promise<T | null> {
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key = ?', key);
+  return row ? (JSON.parse(row.value) as T) : null;
+}
+
+export async function saveRecord(db: SQLiteDatabase, key: string, value: unknown | null): Promise<void> {
+  if (value == null) {
+    await db.runAsync('DELETE FROM settings WHERE key = ?', key);
+    return;
+  }
+  await db.runAsync(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    key, JSON.stringify(value),
+  );
 }
 
 export async function saveFood(

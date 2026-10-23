@@ -1,10 +1,5 @@
 import { normalizeEstimate, type PhotoEstimate } from '../lib/nutrition';
-
-/**
- * Address of the food AI server (server/food-ai.ts), from .env. The app never
- * holds an AI key itself.
- */
-const SERVER_URL = process.env.EXPO_PUBLIC_FOOD_AI_URL?.replace(/\/$/, '');
+import { SERVER_URL } from './server';
 
 export const foodAiConfigured = !!SERVER_URL;
 

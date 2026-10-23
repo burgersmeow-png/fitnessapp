@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap';
@@ -16,6 +16,7 @@ import { generateWorkout, type GeneratedWorkout } from '../../lib/generator';
 import { colors, radius, space, TAP, type } from '../../lib/theme';
 import { ALL_MUSCLES, type Exercise, type Settings } from '../../lib/types';
 import { useFocusData } from '../../lib/useData';
+import { syncStravaIfDue } from '../../services/strava';
 
 interface TodayData {
   workout: GeneratedWorkout;
@@ -35,7 +36,7 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
-  const [data] = useFocusData<TodayData>(async () => {
+  const [data, reload] = useFocusData<TodayData>(async () => {
     const [exercises, history, settings, activeId, cardio, food] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
@@ -62,6 +63,11 @@ export default function TodayScreen() {
       targets: dailyTargets(settings.bodyWeightKg, settings.nutritionGoal, settings.goal),
     };
   }, [seed]);
+
+  // New Strava activities change recovery, so re-plan once they are in.
+  useEffect(() => {
+    syncStravaIfDue(db).then((added) => added > 0 && reload());
+  }, [db, reload]);
 
   if (!data) return <Loading />;
   const { workout, exercises, settings, activeId, weekSessions, lastCardio } = data;

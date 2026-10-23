@@ -27,6 +27,8 @@ import { cancelRestAlert, scheduleRestAlert } from '../services/restAlert';
 import { say } from '../services/speech';
 import { EXAMPLES, parseCommand } from '../lib/voice';
 import { CoachBar } from '../components/CoachBar';
+import { StravaShare } from '../components/StravaShare';
+import type { WorkoutForStrava } from '../lib/strava';
 import { Icon } from '../components/Icon';
 
 function close() {
@@ -39,6 +41,7 @@ interface Summary {
   volume: number;
   minutes: number;
   prs: string[];
+  strava: WorkoutForStrava;
 }
 
 export default function WorkoutScreen() {
@@ -285,11 +288,26 @@ export default function WorkoutScreen() {
         return;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const minutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 6e4));
+      // Per exercise, in workout order: set count and the best set by estimated 1RM.
+      const byExercise = new Map<string, typeof finished>();
+      for (const s of finished) byExercise.set(s.exerciseId, [...(byExercise.get(s.exerciseId) ?? []), s]);
+      const strength = (s: (typeof finished)[number]) => (s.weight && s.reps ? estimate1RM(s.weight, s.reps) : s.reps ?? 0);
       setSummary({
         sets: finished.length,
         volume: finished.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0),
-        minutes: Math.max(1, Math.round((Date.now() - startedAt.current) / 6e4)),
+        minutes,
         prs: prNames,
+        strava: {
+          startedAt: new Date(startedAt.current).toISOString(),
+          minutes,
+          units: settings?.units ?? 'lb',
+          prs: prNames,
+          exercises: [...byExercise].map(([id, list]) => {
+            const best = list.reduce((a, b) => (strength(b) > strength(a) ? b : a));
+            return { name: exercises.get(id)?.name ?? id, sets: list.length, best: { weight: best.weight, reps: best.reps } };
+          }),
+        },
       });
     };
     const remaining = sets.length - done;
@@ -324,6 +342,7 @@ export default function WorkoutScreen() {
           <Stat label={`Volume (${settings?.units})`} value={formatNumber(summary.volume)} />
           <Stat label="Minutes" value={String(summary.minutes)} />
         </View>
+        <StravaShare workout={summary.strava} />
         <Button title="Done" onPress={() => close()} style={{ marginTop: 'auto', marginBottom: insets.bottom + space.md }} />
       </View>
     );

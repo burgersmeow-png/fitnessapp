@@ -12,6 +12,8 @@ export const colors = {
   success: '#2FD07A',
   warning: '#F5B53D',
   danger: '#FF4D4F',
+  /** Strava's brand orange, only for Strava buttons and badges. */
+  strava: '#FC4C02',
 };
 
 export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };

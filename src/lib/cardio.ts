@@ -32,6 +32,8 @@ export interface CardioSession {
   distance: number | null;
   /** Effort from 1 (very easy) to 10 (all out). */
   rpe: number;
+  /** Where it was imported from, e.g. "strava"; null when logged in the app. */
+  source?: string | null;
 }
 
 export interface FatigueEvent {

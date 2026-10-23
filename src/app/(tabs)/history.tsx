@@ -85,7 +85,10 @@ export default function HistoryScreen() {
                 <Icon name={kind?.icon ?? 'pulse'} size={22} color={colors.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: space.md }}>
-                <Text style={type.title}>{kind?.label}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                  <Text style={type.title}>{kind?.label}</Text>
+                  {c.source === 'strava' && <Text style={styles.strava}>STRAVA</Text>}
+                </View>
                 <Text style={styles.meta}>
                   {formatDate(c.startedAt)} · {Math.round(c.minutes)} min{c.distance != null ? ` · ${c.distance} ${settings.units === 'kg' ? 'km' : 'mi'}` : ''} · {effort.label}
                 </Text>
@@ -129,4 +132,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  strava: { color: colors.strava, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
 });

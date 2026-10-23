@@ -32,7 +32,8 @@
           "photosPermission": "Choose a photo of your meal to estimate its calories and macros.",
           "cameraPermission": "Take a photo of your meal to estimate its calories and macros."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "scheme": "liftlab",
     "backgroundColor": "#0E0F12"

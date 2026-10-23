@@ -1,6 +1,8 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StravaCard } from '../../components/StravaCard';
+import { stravaEnabled } from '../../services/strava';
 import { Chip, SectionLabel, Loading } from '../../components/ui';
 import { fromKg, loadSettings, saveSettings, toKg } from '../../lib/db';
 import { dailyTargets } from '../../lib/nutrition';
@@ -41,7 +43,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md }}>
+    <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md, paddingBottom: space.xl }}>
       <SectionLabel>Goal</SectionLabel>
       <View style={styles.wrap}>
         {GOALS.map((g) => (
@@ -94,6 +96,12 @@ export default function SettingsScreen() {
         <Chip label="Pounds (lb, mi)" selected={settings.units === 'lb'} onPress={() => update({ units: 'lb' })} />
       </View>
       <Text style={styles.note}>Switching converts all your past weights and distances too.</Text>
+      {stravaEnabled && (
+        <>
+          <SectionLabel>Strava</SectionLabel>
+          <StravaCard />
+        </>
+      )}
       <Text style={[styles.note, { marginTop: space.md }]}>Today's plan updates as soon as you change these.</Text>
     </ScrollView>
   );
