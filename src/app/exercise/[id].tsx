@@ -1,0 +1,93 @@
+import { useLocalSearchParams } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Card, SectionLabel } from '../../components/ui';
+import { loadExercises, loadHistory, loadSettings } from '../../lib/db';
+import { formatDate, MUSCLE_LABELS } from '../../lib/format';
+import { estimate1RM } from '../../lib/progression';
+import { colors, space, type } from '../../lib/theme';
+import { useFocusData } from '../../lib/useData';
+
+export default function ExerciseScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const db = useSQLiteContext();
+  const [data] = useFocusData(async () => {
+    const [exercises, history, settings] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db)]);
+    const sets = history.filter((s) => s.exerciseId === id);
+    // Best estimated 1RM per training day, oldest first.
+    const byDay = new Map<string, { e1rm: number; weight: number; reps: number }>();
+    for (const s of sets) {
+      const day = s.completedAt.slice(0, 10);
+      const e1rm = estimate1RM(s.weight, s.reps, s.rir);
+      if (!byDay.has(day) || e1rm > byDay.get(day)!.e1rm) byDay.set(day, { e1rm, weight: s.weight, reps: s.reps });
+    }
+    const sessions = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, ...v }));
+    return { exercise: exercises.find((e) => e.id === id), sessions, units: settings.units };
+  }, [id]);
+
+  if (!data?.exercise) return <View style={styles.screen} />;
+  const { exercise, sessions, units } = data;
+  const best = Math.max(0, ...sessions.map((s) => s.e1rm));
+  const recent = sessions.slice(-12);
+
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md }}>
+            <Text style={type.hero}>{exercise.name}</Text>
+      <Text style={[type.body, { color: colors.textMuted, marginTop: space.xs, textTransform: 'capitalize' }]}>
+        {[...exercise.primary, ...exercise.secondary].map((m) => MUSCLE_LABELS[m]).join(', ')} · {exercise.equipment}
+      </Text>
+
+      <SectionLabel>Estimated 1-rep max</SectionLabel>
+      <Card>
+        {sessions.length === 0 ? (
+          <Text style={{ color: colors.textMuted }}>Log this exercise to see your strength trend.</Text>
+        ) : (
+          <>
+            <Text style={type.number}>
+              {Math.round(best)} {units}
+            </Text>
+            <Text style={type.label}>ALL-TIME BEST</Text>
+            <View style={styles.chart}>
+              {recent.map((s) => (
+                <View key={s.day} style={styles.barSlot}>
+                  <View
+                    style={[
+                      styles.bar,
+                      { height: `${Math.max(8, (s.e1rm / best) * 100)}%` },
+                      s.e1rm === best && { backgroundColor: colors.success },
+                    ]}
+                  />
+                </View>
+              ))}
+            </View>
+            <Text style={[type.label, { marginTop: space.xs }]}>LAST {recent.length} SESSIONS</Text>
+          </>
+        )}
+      </Card>
+
+      {sessions.length > 0 && <SectionLabel>Sessions</SectionLabel>}
+      {[...sessions].reverse().map((s) => (
+        <View key={s.day} style={styles.row}>
+          <Text style={type.body}>{formatDate(s.day + 'T12:00:00')}</Text>
+          <Text style={[type.body, { fontWeight: '700' }]}>
+            {s.weight} × {s.reps}
+          </Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', height: 120, marginTop: space.md, gap: 6 },
+  barSlot: { flex: 1, maxWidth: 28, height: '100%', justifyContent: 'flex-end' },
+  bar: { width: '100%', backgroundColor: colors.accent, borderRadius: 4 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+});
