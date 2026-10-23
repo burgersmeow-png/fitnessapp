@@ -18,9 +18,11 @@ import {
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
 import { estimate1RM } from '../../lib/progression';
 import { groupSets, repeatPlan } from '../../lib/repeat';
+import { linkFromSets, type WorkoutLink } from '../../lib/workoutLink';
 import { prHistory } from '../../lib/records';
 import { cardContent, type CardContent } from '../../lib/shareCard';
 import { ShareCardSheet } from '../../components/ShareCardSheet';
+import { WorkoutLinkSheet } from '../../components/WorkoutLinkSheet';
 import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
 
@@ -28,6 +30,7 @@ export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
   const [card, setCard] = useState<CardContent | null>(null);
+  const [link, setLink] = useState<WorkoutLink | null>(null);
   const [data] = useFocusData(async () => {
     const workoutId = Number(id);
     const [workout, sets, exercises, settings, history, activeId] = await Promise.all([
@@ -97,7 +100,15 @@ export default function SessionScreen() {
           ? 'Same lifts, sets and reps, with today’s weights from your progress.'
           : 'You have a workout going. Finish it, then you can do this one again.'}
       </Text>
-      <Button title="Share to your story" variant="secondary" onPress={share} style={{ marginBottom: space.md }} />
+      <View style={styles.shareRow}>
+        <Button title="Share to your story" variant="secondary" onPress={share} style={{ flex: 1 }} />
+        <Button
+          title="Share as a link"
+          variant="secondary"
+          onPress={() => setLink(linkFromSets('', sets, (eid) => exercises.get(eid)?.name ?? eid))}
+          style={{ flex: 1 }}
+        />
+      </View>
 
       {groupSets(sets).map((g, gi) => {
         const e = exercises.get(g.exerciseId);
@@ -125,12 +136,14 @@ export default function SessionScreen() {
       })}
 
       <ShareCardSheet content={card} onClose={() => setCard(null)} />
+      <WorkoutLinkSheet link={link} onClose={() => setLink(null)} />
       <Button title="Delete workout" variant="danger" onPress={remove} style={{ marginTop: space.md }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  shareRow: { flexDirection: 'row', gap: space.sm, marginBottom: space.md },
   screen: { flex: 1, backgroundColor: colors.background },
   sub: { color: colors.textMuted, fontSize: 15, marginTop: space.xs },
   head: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },

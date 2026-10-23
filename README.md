@@ -159,6 +159,17 @@ or a coach removing a client, stops the subscription straight away. App Store no
 payment outside in-app purchase for real person-to-person services such as personal training, but
 review decides, so describe the coaching clearly when you submit.
 
+## Workout links
+
+Any finished workout can be shared as a link (History → a workout → **Share as a link**). The whole
+workout rides inside the link (`?w=…`, see `src/lib/workoutLink.ts`), so no server or account is needed.
+
+- The link opens the landing page (`site/`), which lists the lifts and has an **Open in LiftLab** button
+  (`liftlab://try?w=…`). Add `&code=YOURCODE` to the link to credit a creator code too.
+- In the app, `src/app/try.tsx` loads the workout with weights picked from the follower's own history.
+  Custom lifts the follower doesn't have are matched by name, or skipped with a note.
+- The landing page address comes from `EXPO_PUBLIC_SITE_URL` (defaults to the GitHub Pages site).
+
 ## Creator codes (influencer promotion)
 
 Each creator gets a code like `ALEX10`. Followers type it on the first screen of the app (or later in Settings), or tap the creator's link, which fills it in for them: `https://your-app-link/?code=ALEX10`. The app shows "Welcome from Alex" with the creator's own message.

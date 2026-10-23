@@ -59,6 +59,13 @@
     .points b { display: block; }
     .points span { color: var(--text-muted); font-size: 15px; }
     footer { margin-top: 40px; color: var(--text-muted); font-size: 13px; text-align: center; }
+    .workout { margin-top: 28px; padding: 20px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+    .workout ol { list-style: none; padding: 0; margin: 12px 0 0; }
+    .workout li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .workout li:first-child { border-top: 0; }
+    .workout .lift { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+    .workout .sets { color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .open { display: flex; width: 100%; margin-top: 16px; background: var(--accent); color: var(--accent-text); font-size: 18px; }
     .error { color: #f5b53d; }
     [hidden] { display: none !important; }
     :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
@@ -72,6 +79,14 @@
     <h1 id="headline">Workouts that adapt to you</h1>
     <p class="lead">Every session is planned from what you’ve recovered from, the equipment you have and how your last sets went.</p>
     <p class="welcome" id="welcome" hidden></p>
+
+    <section class="workout" id="workout" hidden aria-labelledby="workout-title">
+      <div class="code-label">Shared workout</div>
+      <h2 id="workout-title" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
+      <ol id="lifts"></ol>
+      <a class="button open" id="open-app" href="#">Open in LiftLab</a>
+      <p class="code-note">Weights are picked from your own history in the app.</p>
+    </section>
 
     <section class="code-card" id="code-card" hidden aria-labelledby="code-label">
       <div class="code-label" id="code-label">Your creator code</div>
@@ -113,10 +128,54 @@
         $('download').addEventListener('click', function (e) { e.preventDefault(); });
       }
 
+      // A shared workout (?w=...): same format as src/lib/workoutLink.ts.
+      var workout = decodeWorkout(params.get('w'));
+      if (workout) {
+        document.title = workout.title + ' · LiftLab';
+        $('eyebrow').textContent = 'Try this workout';
+        $('headline').textContent = workout.title;
+        $('workout-title').textContent = workout.lifts.length + (workout.lifts.length === 1 ? ' lift' : ' lifts');
+        workout.lifts.forEach(function (l) {
+          var li = document.createElement('li');
+          var name = document.createElement('span');
+          name.className = 'lift';
+          name.textContent = l.name;
+          var sets = document.createElement('span');
+          sets.className = 'sets';
+          sets.textContent = l.sets + ' × ' + l.reps;
+          li.appendChild(name);
+          li.appendChild(sets);
+          $('lifts').appendChild(li);
+        });
+        $('open-app').href = 'liftlab://try?w=' + params.get('w');
+        $('workout').hidden = false;
+      }
+
+      function decodeWorkout(w) {
+        if (!w || !/^[A-Za-z0-9_-]+$/.test(w) || w.length > 4000) return null;
+        try {
+          var b64 = w.replace(/-/g, '+').replace(/_/g, '/');
+          while (b64.length % 4) b64 += '=';
+          var bin = atob(b64);
+          var bytes = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          var raw = JSON.parse(new TextDecoder().decode(bytes));
+          if (!Array.isArray(raw) || raw[0] !== 1 || !Array.isArray(raw[2])) return null;
+          var lifts = raw[2].slice(0, 15).filter(function (l) {
+            return Array.isArray(l) && typeof l[1] === 'string' && typeof l[2] === 'number' && typeof l[3] === 'number';
+          }).map(function (l) { return { name: l[1].slice(0, 60), sets: Math.round(l[2]), reps: Math.round(l[3]) }; });
+          if (!lifts.length) return null;
+          return { title: (typeof raw[1] === 'string' && raw[1].trim().slice(0, 40)) || 'Shared workout', lifts: lifts };
+        } catch (e) {
+          return null;
+        }
+      }
+
       if (code.length < 3 || code.length > 20) return;
       $('code').textContent = code;
       $('code-card').hidden = false;
-      $('eyebrow').textContent = 'You’re invited';
+      if (workout) $('open-app').href += '&code=' + code;
+      else $('eyebrow').textContent = 'You’re invited';
 
       function copy() {
         var done = function () { $('copy').textContent = 'Copied'; };
@@ -134,9 +193,13 @@
             return;
           }
           var name = r.body.creatorName;
-          document.title = name + ' invited you to LiftLab';
-          $('eyebrow').textContent = name + ' invited you';
-          $('headline').textContent = 'Train with ' + name + ' on LiftLab';
+          if (workout) {
+            $('eyebrow').textContent = name + '’s workout';
+          } else {
+            document.title = name + ' invited you to LiftLab';
+            $('eyebrow').textContent = name + ' invited you';
+            $('headline').textContent = 'Train with ' + name + ' on LiftLab';
+          }
           if (r.body.welcome) {
             $('welcome').textContent = '“' + r.body.welcome + '”';
             $('welcome').hidden = false;
