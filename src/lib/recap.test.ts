@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { timeStat, recapContent, recapMonth, type RecapInput } from './recap';
+import { timeStat, recapContent, recapMonth, recapWeek, weekLabel, weekRecapContent, type RecapInput } from './recap';
 
 const at = (d: number, h = 7) => new Date(2026, 9, d, h).toISOString();
 const base: RecapInput = {
@@ -61,4 +61,27 @@ test('time shows minutes, then hours with a decimal when small', () => {
   assert.deepEqual(timeStat(42), { value: '42', label: 'MINUTES' });
   assert.deepEqual(timeStat(90), { value: '1.5', label: 'HOURS' });
   assert.deepEqual(timeStat(725), { value: '12', label: 'HOURS' });
+});
+
+test('a week recap counts Monday to Sunday only', () => {
+  // Oct 5 2026 is a Monday; the week holds the Oct 5 cardio and the Oct 9 workout.
+  const c = weekRecapContent({ ...base, week: new Date(2026, 9, 7) }, 'en-US')!;
+  assert.equal(c.eyebrow, 'MY WEEK · 2026');
+  assert.equal(c.headline, 'OCT 5 – 11');
+  assert.deepEqual(c.stats[0], { value: '2', label: 'SESSIONS' });
+  assert.equal(c.stats[2].value, '9,500');
+  assert.deepEqual(c.lines.map((l) => l.name), ['Back Squat', 'Bench Press', 'Barbell Row']);
+  assert.equal(c.lines[2].detail, '3 sets this week');
+  assert.equal(weekRecapContent({ ...base, week: new Date(2026, 9, 14) }), null);
+});
+
+test('week labels name both months across a month end', () => {
+  assert.equal(weekLabel(new Date(2026, 8, 28), 'en-US'), 'SEP 28 – OCT 4');
+});
+
+test('on an empty Monday the recap is still last week', () => {
+  const lastWeek = [new Date(2026, 9, 21, 7).toISOString()];
+  assert.equal(recapWeek(new Date(2026, 9, 26, 9), lastWeek).getDate(), 19);
+  assert.equal(recapWeek(new Date(2026, 9, 26, 9), [...lastWeek, new Date(2026, 9, 26, 7).toISOString()]).getDate(), 26);
+  assert.equal(recapWeek(new Date(2026, 9, 27, 9), lastWeek).getDate(), 26);
 });
