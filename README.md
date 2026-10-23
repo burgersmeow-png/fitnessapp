@@ -174,6 +174,8 @@ Each install that uses a code counts as one sign-up for that creator, and as an 
    Codes are 3 to 20 capital letters and numbers. To retire one: `update creator_codes set active = false where code = 'ALEX10';`
 3. See results any time: `select * from creator_stats;` (sign-ups, active users, sign-ups in the last 7 days).
 
+**The link creators share.** `site/` is a small page for creator links: `https://<you>.github.io/fitnessapp/?code=ALEX10` greets people with the creator's name and message, shows the code with a Copy button, and links to the App Store. It publishes itself to GitHub Pages on every push (one-time setup: repo Settings → Pages → Source: **GitHub Actions**). Fill in `site/config.js` with the helper server address and, once it exists, the App Store link. Until then the button reads "Coming soon to the App Store".
+
 The helper server needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and the app needs `EXPO_PUBLIC_SERVER_URL`. The code tables are invisible to the app itself, and the server limits each address to 20 code checks a minute so codes can't be guessed. The `perk` column is there for a future reward (like a free month) if the app ever adds a paid tier.
 
 ## Strava (switched off for now)

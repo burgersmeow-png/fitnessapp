@@ -187,3 +187,17 @@ test('push token rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE
   assert.equal((await bob.c.from('push_tokens').select()).data.length, 0);
   for (const u of [ann, bob]) await u.c.rpc('delete_account');
 });
+
+test('creator code rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_ANON_KEY' }, async () => {
+  // Codes, referrals and stats are for the helper server only: no app user can list, add or count them.
+  const ann = await user('refann');
+  const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  for (const c of [ann.c, anon]) {
+    assert.ok((await c.from('creator_codes').select()).error);
+    assert.ok((await c.from('referrals').select()).error);
+    assert.ok((await c.from('creator_stats').select()).error);
+    assert.ok((await c.from('creator_codes').insert({ code: `X${run}`.toUpperCase(), creator_name: 'Me' })).error);
+    assert.ok((await c.from('referrals').insert({ install_id: `${run}-0000-0000-0000`, code: 'ALEX10' })).error);
+  }
+  await ann.c.rpc('delete_account');
+});
