@@ -11,6 +11,7 @@ const ICONS = {
   play: { sf: 'play.fill', ion: 'play' },
   pause: { sf: 'pause.fill', ion: 'pause' },
   shuffle: { sf: 'shuffle', ion: 'shuffle' },
+  swap: { sf: 'arrow.left.arrow.right', ion: 'swap-horizontal' },
   time: { sf: 'clock', ion: 'time-outline' },
   sets: { sf: 'square.stack.3d.up', ion: 'layers-outline' },
   goal: { sf: 'flag', ion: 'flag-outline' },

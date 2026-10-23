@@ -17,13 +17,15 @@ import {
   loadSettings,
   loadWorkoutSets,
   saveSettings,
+  swapSets,
   updateSet,
   type WorkoutSet,
 } from '../lib/db';
 import { formatClock, formatNumber, MUSCLE_LABELS } from '../lib/format';
-import { adjustNextSet, estimate1RM, personalRecords } from '../lib/progression';
+import { adjustNextSet, estimate1RM, personalRecords, suggestWeight } from '../lib/progression';
+import { swapOptions } from '../lib/swap';
 import { colors, radius, space, TAP, type } from '../lib/theme';
-import type { Exercise, Settings } from '../lib/types';
+import type { Exercise, LoggedSet, Settings } from '../lib/types';
 import { cancelRestAlert, scheduleRestAlert } from '../services/restAlert';
 import { say } from '../services/speech';
 import { EXAMPLES, parseCommand } from '../lib/voice';
@@ -38,6 +40,7 @@ import { goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/ha
 import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
 import { LiftTools } from '../components/workout/LiftTools';
+import { SwapSheet } from '../components/workout/SwapSheet';
 
 function close() {
   if (router.canGoBack()) router.back();
@@ -76,6 +79,9 @@ export default function WorkoutScreen() {
   const restOverLine = useRef('');
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachReply, setCoachReply] = useState<string | null>(null);
+  const [history, setHistory] = useState<LoggedSet[]>([]);
+  // The exercise group being swapped, by its first set's id.
+  const [swapping, setSwapping] = useState<number | null>(null);
 
   const reload = async (id: number) => setSets(await loadWorkoutSets(db, id));
 
@@ -91,6 +97,7 @@ export default function WorkoutScreen() {
       const thisWorkout = new Set(workoutSets.map((w) => w.completedAt).filter(Boolean));
       const prior = history.filter((h) => !thisWorkout.has(h.completedAt));
       setPreviousBest(new Map([...personalRecords(prior)].map(([k, v]) => [k, v.e1rm])));
+      setHistory(prior);
       setExercises(new Map(list.map((e) => [e.id, e])));
       setSettings(s);
       setWorkoutId(id);
@@ -128,6 +135,26 @@ export default function WorkoutScreen() {
   }, [sets]);
 
   const done = sets.filter((s) => s.completedAt).length;
+
+  const swapGroup = groups.find((g) => g.sets[0].id === swapping) ?? null;
+  const swapFrom = swapGroup ? exercises.get(swapGroup.exerciseId) ?? null : null;
+  const swapChoices = useMemo(
+    () => (swapFrom && settings ? swapOptions(swapFrom, [...exercises.values()], settings.equipment, groups.map((g) => g.exerciseId)) : []),
+    [swapFrom, settings, exercises, groups],
+  );
+  /** Where the new lift would start, from its own history at today's targets. */
+  const swapWeight = (e: Exercise) => {
+    const first = swapGroup?.sets.find((s) => !s.completedAt);
+    if (!first || first.targetReps == null || first.targetRir == null) return null;
+    return suggestWeight(history, e.id, first.targetReps, first.targetRir, settings?.units === 'kg' ? 2.5 : 5);
+  };
+  const swapTo = async (e: Exercise) => {
+    if (!swapGroup || workoutId == null) return;
+    const ids = swapGroup.sets.filter((s) => !s.completedAt).map((s) => s.id);
+    await swapSets(db, ids, e.id, e.equipment === 'bodyweight' ? null : swapWeight(e));
+    setSwapping(null);
+    await reload(workoutId);
+  };
 
   const edit = (id: number, field: 'weight' | 'reps' | 'rir', value: number | null) => {
     setSets((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
@@ -455,19 +482,33 @@ export default function WorkoutScreen() {
           const left = g.sets.filter((s) => !s.completedAt).length;
           return (
             <Card key={`${g.exerciseId}-${g.sets[0].id}`} style={{ marginBottom: space.md }}>
-              <Pressable
-                onPress={() => router.push(`/exercise/${g.exerciseId}`)}
-                style={styles.exHeader}
-                accessibilityRole="button"
-                accessibilityHint="Shows how to do it"
-              >
-                {e && <ExerciseThumb exercise={e} size={52} />}
-                <View style={{ flex: 1, marginLeft: space.md }}>
-                  <Text style={[type.title, { fontSize: 19 }]}>{e?.name}</Text>
-                  <Text style={styles.meta}>{e?.primary.map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
-                </View>
-                {left === 0 && <Text style={styles.doneBadge}>✓</Text>}
-              </Pressable>
+              <View style={styles.exHeader}>
+                <Pressable
+                  onPress={() => router.push(`/exercise/${g.exerciseId}`)}
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityHint="Shows how to do it"
+                >
+                  {e && <ExerciseThumb exercise={e} size={52} />}
+                  <View style={{ flex: 1, marginLeft: space.md }}>
+                    <Text style={[type.title, { fontSize: 19 }]}>{e?.name}</Text>
+                    <Text style={styles.meta}>{e?.primary.map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
+                  </View>
+                </Pressable>
+                {left === 0 ? (
+                  <Text style={styles.doneBadge}>✓</Text>
+                ) : (
+                  <Pressable
+                    onPress={() => setSwapping(g.sets[0].id)}
+                    style={styles.swapButton}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Swap ${e?.name ?? 'exercise'}`}
+                  >
+                    <Icon name="swap" size={20} color={colors.textMuted} />
+                  </Pressable>
+                )}
+              </View>
               <Text style={[styles.meta, { marginBottom: space.sm }]}>
                 {left > 0 ? `${left} to go` : 'All sets done'} · target {g.sets[0].targetReps} reps, {g.sets[0].targetRir} in reserve
               </Text>
@@ -515,6 +556,16 @@ export default function WorkoutScreen() {
           );
         })}
       </ScrollView>
+
+      <SwapSheet
+        current={swapFrom}
+        options={swapChoices}
+        units={settings?.units ?? 'lb'}
+        weightFor={swapWeight}
+        partlyDone={!!swapGroup?.sets.some((s) => s.completedAt)}
+        onPick={swapTo}
+        onClose={() => setSwapping(null)}
+      />
 
       {restEndsAt != null && (
         <View style={[styles.rest, { paddingBottom: insets.bottom + space.sm }]}>
@@ -684,6 +735,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },
+  swapButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
   doneBadge: { color: colors.success, fontSize: 22, fontWeight: '800' },
   columns: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.xs },
   colLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '700', textAlign: 'center' },

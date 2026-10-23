@@ -12,6 +12,8 @@ export const colors = {
   success: '#2FD07A',
   warning: '#F5B53D',
   danger: '#FF4D4F',
+  /** Dims the screen behind a sheet. */
+  overlay: 'rgba(0, 0, 0, 0.6)',
   /** Strava's brand orange, only for Strava buttons and badges. */
   strava: '#FC4C02',
 };

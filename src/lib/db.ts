@@ -294,6 +294,15 @@ export async function addSet(db: SQLiteDatabase, workoutId: number, after: Worko
   );
 }
 
+/** Moves the given (not yet done) sets to another exercise, with a fresh starting weight. */
+export async function swapSets(db: SQLiteDatabase, setIds: number[], exerciseId: string, weight: number | null): Promise<void> {
+  if (setIds.length === 0) return;
+  await db.runAsync(
+    `UPDATE sets SET exercise_id = ?, weight = ?, rir = NULL WHERE completed_at IS NULL AND id IN (${setIds.map(() => '?').join(', ')})`,
+    exerciseId, toKgOrNull(weight), ...setIds,
+  );
+}
+
 /** Ends the workout, dropping sets that were never completed. Deletes it if nothing was logged. */
 export async function finishWorkout(db: SQLiteDatabase, workoutId: number): Promise<void> {
   await db.withTransactionAsync(async () => {
