@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { badgeCardContent, cardContent, compactNumber, prCardContent, streakCardContent, type CardInput } from './shareCard';
+import { badgeCardContent, cardContent, compactNumber, prCardContent, streakCardContent, workoutCardContent, type CardInput } from './shareCard';
 
 const base: CardInput = {
   startedAt: new Date(2026, 9, 23, 7).toISOString(),
@@ -69,4 +69,19 @@ test('a streak card leads with the run of weeks', () => {
   assert.equal(c.headline, '6-WEEK STREAK');
   assert.deepEqual(c.stats.map((s) => s.value), ['2/3', '6', '21']);
   assert.equal(c.lines[0].detail, 'Hit 6 weeks in a row');
+});
+
+test('a shared workout card lists the lifts and the score to beat', () => {
+  const lifts = Array.from({ length: 7 }, (_, i) => ({ id: `l${i}`, name: `Lift ${i + 1}`, sets: 3, reps: 8, rest: 90 }));
+  const c = workoutCardContent({ title: 'Leg day', lifts, beat: { volume: 12400, units: 'lb' } });
+  assert.equal(c.eyebrow, 'CAN YOU BEAT MY WORKOUT?');
+  assert.equal(c.headline, 'LEG DAY');
+  assert.deepEqual(c.stats, [{ value: '7', label: 'LIFTS' }, { value: '21', label: 'SETS' }, { value: '12.4K', label: 'LB TO BEAT' }]);
+  assert.equal(c.lines.length, 5);
+  assert.equal(c.lines[0].detail, '3 × 8');
+  assert.equal(c.more, 2);
+  const plain = workoutCardContent({ title: ' ', lifts: lifts.slice(0, 1) });
+  assert.equal(plain.eyebrow, 'TRY MY WORKOUT');
+  assert.equal(plain.headline, 'MY WORKOUT');
+  assert.deepEqual(plain.stats.map((s) => s.label), ['LIFT', 'SETS']);
 });

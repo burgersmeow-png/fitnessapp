@@ -7,6 +7,8 @@ import { TITLE_MAX, workoutUrl, type WorkoutLink } from '../lib/workoutLink';
 import { linkWithMyCode } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
 import { shareLink } from '../services/shareLink';
+import { workoutCardContent, type CardContent } from '../lib/shareCard';
+import { ShareCardSheet } from './ShareCardSheet';
 import { Button } from './ui';
 
 /** Name a workout and share it as a link followers can open in LiftLab. */
@@ -16,16 +18,22 @@ export function WorkoutLinkSheet({ link, onClose }: { link: WorkoutLink | null; 
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [dare, setDare] = useState(true);
+  const [card, setCard] = useState<CardContent | null>(null);
   useEffect(() => {
     setTitle(link?.title ?? '');
     setStatus(null);
     setDare(true);
   }, [link]);
 
+  // The link as it will be shared: named, with the score to beat only if it's switched on.
+  const namedLink = (): WorkoutLink => {
+    const { beat, ...rest } = link!;
+    return { ...rest, title: title.trim() || 'My workout', ...(beat && dare ? { beat } : {}) };
+  };
+
   const share = async () => {
     if (!link) return;
-    const { beat, ...rest } = link;
-    const named = { ...rest, title: title.trim() || 'My workout', ...(beat && dare ? { beat } : {}) };
+    const named = namedLink();
     const text = named.beat
       ? `I did "${named.title}" for ${named.beat.volume.toLocaleString('en-US')} ${named.beat.units}. Can you beat it on LiftLab?`
       : `Try my workout "${named.title}" on LiftLab:`;
@@ -86,7 +94,11 @@ export function WorkoutLinkSheet({ link, onClose }: { link: WorkoutLink | null; 
           ))}
         </ScrollView>
         {status && <Text style={styles.status}>{status}</Text>}
-        <Button title="Share link" onPress={share} style={{ marginHorizontal: space.md }} />
+        <View style={styles.buttons}>
+          <Button title="Story image" variant="secondary" onPress={() => setCard(workoutCardContent(namedLink()))} style={{ flex: 1 }} />
+          <Button title="Share link" onPress={share} style={{ flex: 1 }} />
+        </View>
+        <ShareCardSheet content={card} onClose={() => setCard(null)} title="Post it to your story" fileName="liftlab-workout-link.png" />
       </View>
     </Modal>
   );
@@ -108,5 +120,6 @@ const styles = StyleSheet.create({
   toggleOn: { backgroundColor: colors.accent },
   knob: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.textMuted },
   knobOn: { backgroundColor: colors.text, marginLeft: 20 },
+  buttons: { flexDirection: 'row', gap: space.sm, marginHorizontal: space.md },
   status: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: space.sm, paddingHorizontal: space.md },
 });
