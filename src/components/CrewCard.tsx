@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { creatorCodesAvailable, loadCreator } from '../services/creatorCode';
+import { crewThisWeek } from '../services/creatorFeed';
 import { joinCrew, leaveCrew, loadCrewBoard, loadCrewName, type CrewPlace } from '../services/crew';
 import { confirm } from './confirm';
 import { ShareCardSheet } from './ShareCardSheet';
@@ -21,7 +22,7 @@ export function CrewCard() {
     const creator = creatorCodesAvailable() ? await loadCreator(db) : null;
     if (!creator) return null;
     const nickname = await loadCrewName(db);
-    return { creator, nickname, board: nickname ? await loadCrewBoard(db) : null };
+    return { creator, nickname, board: nickname ? await loadCrewBoard(db) : null, training: nickname ? 0 : await crewThisWeek(db) };
   }, []);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -47,7 +48,11 @@ export function CrewCard() {
           </View>
           <View style={{ flex: 1, marginLeft: space.md }}>
             <Text style={styles.title}>Join {who}’s crew</Text>
-            <Text style={styles.meta}>A weekly leaderboard of {who}’s followers. Just a nickname, no account.</Text>
+            <Text style={styles.meta}>
+              {data.training > 1
+                ? `${data.training} people trained with ${who} this week. Join with just a nickname.`
+                : `A weekly leaderboard of ${who}’s followers. Just a nickname, no account.`}
+            </Text>
           </View>
           <Icon name="chevron" size={20} color={colors.textMuted} />
         </Pressable>

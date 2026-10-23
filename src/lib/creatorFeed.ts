@@ -15,6 +15,8 @@ export interface CreatorFeed {
   seen: string[];
   /** When the server was last asked (ISO). */
   checkedAt: string;
+  /** Followers on the creator's crew leaderboard who trained this week. */
+  crewThisWeek?: number;
 }
 
 export const FEED_MAX = 6;
@@ -55,9 +57,9 @@ export const feedStale = (feed: CreatorFeed | null, now: Date) => !feed || now.g
  * The feed after a fresh fetch. The first time, everything counts as seen (it's not "new" to
  * someone who just arrived); after that only pins that weren't there before are new.
  */
-export function mergeFeed(prev: CreatorFeed | null, name: string, pins: Pin[], now: Date): CreatorFeed {
+export function mergeFeed(prev: CreatorFeed | null, name: string, pins: Pin[], now: Date, crewThisWeek = 0): CreatorFeed {
   const seen = prev ? prev.seen.filter((s) => pins.some((p) => p.payload === s)) : pins.map((p) => p.payload);
-  return { name, pins, seen, checkedAt: now.toISOString() };
+  return { name, pins, seen, checkedAt: now.toISOString(), crewThisWeek };
 }
 
 export const markSeen = (feed: CreatorFeed, pin: Pin): CreatorFeed =>

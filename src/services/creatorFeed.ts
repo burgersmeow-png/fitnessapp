@@ -19,8 +19,9 @@ export async function loadFeed(db: SQLiteDatabase, now = new Date()): Promise<Cr
     try {
       const res = await fetch(`${SERVER_URL}/ref/check?code=${encodeURIComponent(creator.code)}`);
       if (res.ok) {
-        const body = (await res.json()) as { creatorName?: string; pins?: unknown };
-        feed = mergeFeed(feed, body.creatorName ?? creator.creatorName, cleanPins(body.pins), now);
+        const body = (await res.json()) as { creatorName?: string; pins?: unknown; crewThisWeek?: unknown };
+        const crew = typeof body.crewThisWeek === 'number' && body.crewThisWeek >= 0 ? Math.round(body.crewThisWeek) : 0;
+        feed = mergeFeed(feed, body.creatorName ?? creator.creatorName, cleanPins(body.pins), now, crew);
         await saveRecord(db, KEY, feed);
       }
     } catch {
@@ -28,6 +29,12 @@ export async function loadFeed(db: SQLiteDatabase, now = new Date()): Promise<Cr
     }
   }
   return feed && feed.pins.length ? feed : null;
+}
+
+/** How many of the creator's crew trained this week, from the last check (0 if unknown). */
+export async function crewThisWeek(db: SQLiteDatabase): Promise<number> {
+  await loadFeed(db);
+  return (await loadRecord<CreatorFeed>(db, KEY))?.crewThisWeek ?? 0;
 }
 
 export async function markPinSeen(db: SQLiteDatabase, pin: Pin): Promise<void> {
