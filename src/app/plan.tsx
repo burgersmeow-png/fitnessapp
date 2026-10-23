@@ -9,12 +9,15 @@ import { colors, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { loadPlan, startFollowing, stopFollowing } from '../services/plan';
 import { loadProgram, stopProgram } from '../services/programs';
+import { linkWithMyCode } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
+import { useLinkCredit } from '../components/useLinkCredit';
 import { shareLink } from '../services/shareLink';
 
 /** A plan opened from a link (liftlab://plan?p=…), or the one you follow. */
 export default function PlanScreen() {
-  const { p } = useLocalSearchParams<{ p?: string }>();
+  const { p, code } = useLocalSearchParams<{ p?: string; code?: string }>();
+  const creator = useLinkCredit(code);
   const db = useSQLiteContext();
   const [status, setStatus] = useState<string | null>(null);
   const [data, reload] = useFocusData(async () => {
@@ -57,7 +60,7 @@ export default function PlanScreen() {
   const share = async () => {
     setStatus(null);
     try {
-      const r = await shareLink(`Follow my LiftLab plan "${plan.title}":`, planUrl(SITE_URL, plan));
+      const r = await shareLink(`Follow my LiftLab plan "${plan.title}":`, await linkWithMyCode(db, planUrl(SITE_URL, plan)));
       if (r === 'copied') setStatus('Link copied. Paste it in your bio, story or a message.');
     } catch {
       setStatus('Could not share the link.');
@@ -66,7 +69,7 @@ export default function PlanScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md, paddingBottom: space.xl }}>
-      <Text style={type.label}>{following ? 'YOUR PLAN' : 'SHARED PLAN'}</Text>
+      <Text style={type.label}>{following ? 'YOUR PLAN' : creator ? `${creator.toUpperCase()}’S PLAN` : 'SHARED PLAN'}</Text>
       <Text style={[type.hero, { marginTop: space.xs }]}>{plan.title}</Text>
       <Text style={styles.sub}>
         {plan.days.length} {plan.days.length === 1 ? 'day' : 'days'}, done in order, one per session.

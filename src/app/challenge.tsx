@@ -14,14 +14,17 @@ import { useFocusData } from '../lib/useData';
 import { joinChallenge, leaveChallenge, loadChallenge } from '../services/challenge';
 import { loadBoard, syncChallengeEntry, type Board } from '../services/challengeBoard';
 import { loadSessionDates } from '../services/habits';
+import { linkWithMyCode } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
+import { useLinkCredit } from '../components/useLinkCredit';
 import { shareLink } from '../services/shareLink';
 
 const rules = (c: ChallengeDef) => `${trainingDays(c.sessions)} in ${c.days} days. Lifting and cardio both count, once per day.`;
 
 /** Your challenge, or an invite opened from a link (liftlab://challenge?c=…). */
 export default function ChallengeScreen() {
-  const { c } = useLocalSearchParams<{ c?: string }>();
+  const { c, code } = useLocalSearchParams<{ c?: string; code?: string }>();
+  const creator = useLinkCredit(code);
   const db = useSQLiteContext();
   const [card, setCard] = useState<CardContent | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -60,7 +63,7 @@ export default function ChallengeScreen() {
   const invitePeople = async (def: ChallengeDef) => {
     setStatus(null);
     try {
-      const r = await shareLink(`Join my LiftLab challenge "${def.title}":`, challengeUrl(SITE_URL, def));
+      const r = await shareLink(`Join my LiftLab challenge "${def.title}":`, await linkWithMyCode(db, challengeUrl(SITE_URL, def)));
       if (r === 'copied') setStatus('Invite link copied. Paste it in your bio, story or a message.');
     } catch {
       setStatus('Could not share the link.');
@@ -71,7 +74,7 @@ export default function ChallengeScreen() {
   if (invite && !sameAsInvite) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md, paddingBottom: space.xl }}>
-        <Text style={type.label}>YOU’RE INVITED</Text>
+        <Text style={type.label}>{creator ? `${creator.toUpperCase()} INVITED YOU` : 'YOU’RE INVITED'}</Text>
         <Text style={[type.hero, { marginTop: space.xs }]}>{invite.title}</Text>
         <Text style={styles.sub}>{rules(invite)} Day 1 is the day you join.</Text>
         <Button title="Join challenge" onPress={() => join(invite)} style={{ marginTop: space.lg }} />

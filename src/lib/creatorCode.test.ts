@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { codeFromUrl, newInstallId, normalizeCode } from './creatorCode';
+import { codeFromUrl, newInstallId, normalizeCode, withCode } from './creatorCode';
 
 test('codes are tidied', () => {
   assert.equal(normalizeCode(' alex 10 '), 'ALEX10');
@@ -20,4 +20,12 @@ test('install ids match the server format', () => {
   const id = newInstallId(() => (i++ % 16) / 16);
   assert.match(id, /^[a-z0-9-]{16,64}$/);
   assert.equal(id.length, 36);
+});
+
+test('a creator’s own code is added to links they share, once', () => {
+  assert.equal(withCode('https://x.io/?w=abc', 'ALEX10'), 'https://x.io/?w=abc&code=ALEX10');
+  assert.equal(withCode('https://x.io/', 'ALEX10'), 'https://x.io/?code=ALEX10');
+  assert.equal(withCode('https://x.io/?w=abc&code=SAM1', 'ALEX10'), 'https://x.io/?w=abc&code=SAM1');
+  assert.equal(withCode('https://x.io/?w=abc', null), 'https://x.io/?w=abc');
+  assert.equal(codeFromUrl(withCode('liftlab://plan?p=xyz', 'ALEX10')), 'ALEX10');
 });

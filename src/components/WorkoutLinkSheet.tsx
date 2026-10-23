@@ -1,8 +1,10 @@
+import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, space, type } from '../lib/theme';
 import { TITLE_MAX, workoutUrl, type WorkoutLink } from '../lib/workoutLink';
+import { linkWithMyCode } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
 import { shareLink } from '../services/shareLink';
 import { Button } from './ui';
@@ -10,6 +12,7 @@ import { Button } from './ui';
 /** Name a workout and share it as a link followers can open in LiftLab. */
 export function WorkoutLinkSheet({ link, onClose }: { link: WorkoutLink | null; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const db = useSQLiteContext();
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   useEffect(() => {
@@ -21,7 +24,7 @@ export function WorkoutLinkSheet({ link, onClose }: { link: WorkoutLink | null; 
     if (!link) return;
     const named = { ...link, title: title.trim() || 'My workout' };
     try {
-      const r = await shareLink(`Try my workout "${named.title}" on LiftLab:`, workoutUrl(SITE_URL, named));
+      const r = await shareLink(`Try my workout "${named.title}" on LiftLab:`, await linkWithMyCode(db, workoutUrl(SITE_URL, named)));
       setStatus(r === 'copied' ? 'Link copied. Paste it in your bio, story or a message.' : null);
     } catch {
       setStatus('Could not share the link.');

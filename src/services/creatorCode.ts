@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { loadRecord, saveRecord } from '../lib/db';
-import { newInstallId, type CreatorState } from '../lib/creatorCode';
+import { newInstallId, normalizeCode, withCode, type CreatorState } from '../lib/creatorCode';
 import { SERVER_URL } from './server';
 
 const STATE = 'creator-code';
@@ -62,4 +62,32 @@ export async function flushCreator(db: SQLiteDatabase): Promise<void> {
     if (done?.n && (await post('/ref/active', { installId: id }))) next = { ...next, activeSent: true };
   }
   if (next !== state) await saveRecord(db, STATE, next);
+}
+
+const MY_CODE = 'my-creator-code';
+
+/** For creators: their own code, added to every link they share from the app. */
+export const loadMyCode = (db: SQLiteDatabase) => loadRecord<string>(db, MY_CODE);
+export const saveMyCode = (db: SQLiteDatabase, code: string | null) => saveRecord(db, MY_CODE, code);
+
+/** A link to share, with the sharer's creator code on it if they set one. */
+export async function linkWithMyCode(db: SQLiteDatabase, url: string): Promise<string> {
+  return withCode(url, await loadMyCode(db));
+}
+
+/**
+ * Credits the creator whose code came on a link someone opened (a workout, plan or challenge),
+ * if this phone doesn't have a code yet. Quiet: a bad code or no signal just does nothing.
+ * Returns the creator's name when this link set the code.
+ */
+export async function creditFromLink(db: SQLiteDatabase, raw: string | null | undefined): Promise<string | null> {
+  const code = raw ? normalizeCode(raw) : null;
+  if (!code || !SERVER_URL || (await loadCreator(db))) return null;
+  try {
+    const found = await checkCode(code);
+    await applyCode(db, found);
+    return found.creatorName;
+  } catch {
+    return null;
+  }
 }

@@ -10,6 +10,7 @@ import { encodePlan, MAX_DAYS, PLAN_TITLE_MAX, planUrl, type PlanLink } from '..
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { linkFromSets, TITLE_MAX } from '../lib/workoutLink';
+import { linkWithMyCode } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
 import { shareLink } from '../services/shareLink';
 
@@ -43,7 +44,7 @@ export default function NewPlanScreen() {
     setStatus(null);
     try {
       const plan = await build();
-      const r = await shareLink(`Follow my LiftLab plan "${plan.title}":`, planUrl(SITE_URL, plan));
+      const r = await shareLink(`Follow my LiftLab plan "${plan.title}":`, await linkWithMyCode(db, planUrl(SITE_URL, plan)));
       if (r === 'copied') setStatus('Link copied. Paste it in your bio, story or a message.');
     } catch {
       setStatus('Could not share the link.');

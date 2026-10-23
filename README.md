@@ -208,6 +208,13 @@ Each install that uses a code counts as one sign-up for that creator, and as an 
 The helper server needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and the app needs `EXPO_PUBLIC_SERVER_URL`. The code tables are invisible to the app itself, and the server limits each address to 20 code checks a minute so codes can't be guessed. The `perk` column is there for a future reward (like a free month) if the app ever adds a paid tier.
 
 
+### Credit from shared links
+
+Creators enter their own code in Settings → **Are you a creator?**. Every workout, plan and challenge
+link they share from the app then ends in `&code=THEIRCODE`. When a follower opens one of those links,
+the app applies that code (if the phone has none yet), so the sign-up counts for the creator without
+anyone typing a code.
+
 ### Creator dashboard
 
 Each creator gets a private page, `site/creator.html`, with their sign-ups, active users and a 14-day

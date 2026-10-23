@@ -8,13 +8,15 @@ import { activeWorkoutId, loadExercises, loadHistory, loadSettings, startWorkout
 import { formatNumber } from '../lib/format';
 import { colors, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
+import { useLinkCredit } from '../components/useLinkCredit';
 import { isSaved } from '../lib/savedWorkouts';
 import { decodeWorkoutLink, encodeWorkoutLink, planFromLink } from '../lib/workoutLink';
 import { forgetWorkout, keepWorkout, loadSaved } from '../services/savedWorkouts';
 
 /** Opened from a shared workout link (liftlab://try?w=…). */
 export default function TryWorkoutScreen() {
-  const { w } = useLocalSearchParams<{ w?: string }>();
+  const { w, code } = useLocalSearchParams<{ w?: string; code?: string }>();
+  const creator = useLinkCredit(code);
   const db = useSQLiteContext();
   const [data, reload] = useFocusData(async () => {
     const link = decodeWorkoutLink(w);
@@ -50,7 +52,7 @@ export default function TryWorkoutScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md, paddingBottom: space.xl }}>
-      <Text style={type.label}>SHARED WORKOUT</Text>
+      <Text style={type.label}>{creator ? `${creator.toUpperCase()}’S WORKOUT` : 'SHARED WORKOUT'}</Text>
       <Text style={[type.hero, { marginTop: space.xs }]}>{link.title}</Text>
       <Text style={styles.sub}>
         {plan.length} {plan.length === 1 ? 'lift' : 'lifts'} · {plan.reduce((n, p) => n + p.sets, 0)} sets. Weights are picked from your own history.

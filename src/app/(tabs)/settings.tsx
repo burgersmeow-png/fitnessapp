@@ -8,6 +8,7 @@ import { socialConfigured } from '../../services/supabase';
 import { Button, Chip, SectionLabel, Loading } from '../../components/ui';
 import { exportTrainingLog } from '../../services/exportLog';
 import { CreatorCodeEntry } from '../../components/CreatorCodeEntry';
+import { MyCreatorCode } from '../../components/MyCreatorCode';
 import { creatorCodesAvailable } from '../../services/creatorCode';
 import { fromKg, loadSettings, saveSettings, toKg } from '../../lib/db';
 import { formatTime } from '../../lib/habits';
@@ -182,6 +183,7 @@ export default function SettingsScreen() {
         <>
           <SectionLabel>Creator code</SectionLabel>
           <CreatorCodeEntry startOpen />
+          <MyCreatorCode />
         </>
       )}
       <SectionLabel>Your data</SectionLabel>

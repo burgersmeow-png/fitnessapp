@@ -28,3 +28,9 @@ export interface CreatorState {
   /** The server knows this install finished a workout. */
   activeSent: boolean;
 }
+
+/** Adds a creator's code to a link they share, so sign-ups from it count for them. */
+export function withCode(url: string, code: string | null): string {
+  if (!code || /[?&]code=/.test(url)) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}code=${code}`;
+}
