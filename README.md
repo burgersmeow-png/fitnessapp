@@ -210,6 +210,7 @@ Code layout:
 - `src/lib/superset.ts` supersets: alternate two lifts, rest after the second
 - `src/lib/measurements.ts` tape measurements per body part (`src/components/Measurements.tsx` on Progress)
 - `src/lib/records.ts` best set per lift and PR history (`src/app/records.tsx`)
+- `src/lib/restTimes.ts` your own rest time per lift, remembered (`src/components/workout/RestControl.tsx`)
 - `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
 - `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
 - `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting

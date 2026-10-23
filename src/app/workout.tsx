@@ -45,6 +45,9 @@ import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
 import { LiftTools } from '../components/workout/LiftTools';
 import { SwapSheet } from '../components/workout/SwapSheet';
+import { RestControl } from '../components/workout/RestControl';
+import { adjustRest, restFor, type RestTimes } from '../lib/restTimes';
+import { loadRestTimes, saveRestTimes } from '../services/restTimes';
 import { LiftNote } from '../components/LiftNote';
 import { loadNotes, saveNote } from '../services/notes';
 import type { LiftNotes } from '../lib/notes';
@@ -89,6 +92,7 @@ export default function WorkoutScreen() {
   const [history, setHistory] = useState<LoggedSet[]>([]);
   const [notes, setNotes] = useState<LiftNotes>({});
   const [pairs, setPairs] = useState<Pair[]>([]);
+  const [restTimes, setRestTimes] = useState<RestTimes>({});
   // The exercise group being swapped, by its first set's id.
   const [swapping, setSwapping] = useState<number | null>(null);
 
@@ -103,6 +107,7 @@ export default function WorkoutScreen() {
       }
       const [list, history, s, n] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), loadNotes(db)]);
       setNotes(n);
+      setRestTimes(await loadRestTimes(db));
       const workoutSets = await loadWorkoutSets(db, id);
       const thisWorkout = new Set(workoutSets.map((w) => w.completedAt).filter(Boolean));
       const prior = history.filter((h) => !thisWorkout.has(h.completedAt));
@@ -159,6 +164,14 @@ export default function WorkoutScreen() {
     await reload(workoutId);
   };
 
+  /** The set with the lifter's own rest time for that lift, if they set one. */
+  const withRest = (s: WorkoutSet): WorkoutSet => ({ ...s, restSeconds: restFor(restTimes, s.exerciseId, s.restSeconds) });
+  const changeRest = (g: { exerciseId: string; sets: WorkoutSet[] }, delta: number) => {
+    const next = adjustRest(restTimes, g.exerciseId, g.sets[0].restSeconds, delta);
+    setRestTimes(next);
+    saveRestTimes(db, next);
+  };
+
   const savePairs = (next: Pair[]) => {
     setPairs(next);
     if (workoutId != null) saveRecord(db, `superset:${workoutId}`, next.length ? next : null);
@@ -189,7 +202,7 @@ export default function WorkoutScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       setRestNote(await autoAdjust(set));
-      const rest = restAfterSet(set, sets, pairs);
+      const rest = restAfterSet(withRest(set), sets.map(withRest), pairs);
       if (rest > 0) startRest(rest, set);
       else skipRest(); // Superset: straight on to the partner lift.
     }
@@ -256,7 +269,11 @@ export default function WorkoutScreen() {
         await toggle(logged);
         const following = sets.find((s) => s.id !== logged.id && !s.completedAt && s.position > logged.position);
         reply = `Logged ${logged.reps} reps${logged.weight != null ? ` at ${logged.weight}` : ''}.${
-          following ? ` Rest ${Math.round(logged.restSeconds / 15) * 15} seconds.` : ' That was the last set.'
+          !following
+            ? ' That was the last set.'
+            : (rest => (rest > 0 ? ` Rest ${Math.round(rest / 15) * 15} seconds.` : ' Straight on to the next lift.'))(
+                restAfterSet(withRest(logged), sets.map(withRest), pairs),
+              )
         }`;
       }
     } else if (cmd.kind === 'skipRest') {
@@ -527,9 +544,18 @@ export default function WorkoutScreen() {
                     </Pressable>
                   )}
                 </View>
-                <Text style={[styles.meta, { marginBottom: space.sm }]}>
-                  {left > 0 ? `${left} to go` : 'All sets done'} · target {g.sets[0].targetReps} reps, {g.sets[0].targetRir} in reserve
-                </Text>
+                <View style={styles.metaRow}>
+                  <Text style={[styles.meta, { flex: 1 }]}>
+                    {left > 0 ? `${left} to go` : 'All sets done'} · target {g.sets[0].targetReps} reps, {g.sets[0].targetRir} in reserve
+                  </Text>
+                  {left > 0 && (
+                    <RestControl
+                      seconds={restFor(restTimes, g.exerciseId, g.sets[0].restSeconds)}
+                      custom={restTimes[g.exerciseId] != null}
+                      onAdjust={(d) => changeRest(g, d)}
+                    />
+                  )}
+                </View>
                 {e && left > 0 && (
                   <LiftTools
                     exercise={e}
@@ -776,6 +802,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.sm },
   supersetCard: { borderLeftWidth: 3, borderLeftColor: colors.accent },
   supersetLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, minHeight: 40 },
   supersetLine: { position: 'absolute', left: space.lg, top: 0, bottom: 0, width: 3, backgroundColor: colors.accent },
