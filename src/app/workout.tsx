@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExerciseThumb } from '../components/ExerciseThumb';
+import { ProgressRing } from '../components/ProgressRing';
 import { Button, Card } from '../components/ui';
 import {
   activeWorkoutId,
@@ -22,6 +23,7 @@ import { formatClock, formatNumber, MUSCLE_LABELS } from '../lib/format';
 import { adjustNextSet, estimate1RM, personalRecords } from '../lib/progression';
 import { colors, radius, space, TAP, type } from '../lib/theme';
 import type { Exercise, Settings } from '../lib/types';
+import { cancelRestAlert, scheduleRestAlert } from '../services/restAlert';
 
 function close() {
   if (router.canGoBack()) router.back();
@@ -51,6 +53,7 @@ export default function WorkoutScreen() {
   // A short note on the rest bar, e.g. when the next sets were auto-adjusted.
   const [restNote, setRestNote] = useState<string | null>(null);
   const startedAt = useRef(Date.now());
+  const nextUp = useRef('next set');
 
   const reload = async (id: number) => setSets(await loadWorkoutSets(db, id));
 
@@ -73,7 +76,11 @@ export default function WorkoutScreen() {
     })();
   }, [db]);
 
-  // Rest timer tick.
+  // Leaving the screen ends the rest, so the alert shouldn't fire later.
+  useEffect(() => () => void cancelRestAlert(), []);
+
+  // Rest timer tick. The end time is stored rather than a countdown, so the
+  // timer is right again as soon as the app comes back from the background.
   useEffect(() => {
     if (restEndsAt == null) return;
     const timer = setInterval(() => {
@@ -124,10 +131,42 @@ export default function WorkoutScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       setRestNote(await autoAdjust(set));
-      setRestEndsAt(Date.now() + set.restSeconds * 1000);
-      setNow(Date.now());
+      startRest(set.restSeconds, set);
     }
     await reload(workoutId!);
+  };
+
+  /** Name of the exercise the lifter does next, for the rest alert. */
+  const nextUpAfter = (set: WorkoutSet) => {
+    const next = sets.find((s) => s.id !== set.id && !s.completedAt && s.position > set.position)
+      ?? sets.find((s) => s.id !== set.id && !s.completedAt);
+    return next ? exercises.get(next.exerciseId)?.name ?? 'next set' : 'wrap up and finish';
+  };
+
+  const startRest = (seconds: number, set: WorkoutSet) => {
+    setRestEndsAt(Date.now() + seconds * 1000);
+    setNow(Date.now());
+    nextUp.current = nextUpAfter(set);
+    scheduleRestAlert(seconds, nextUp.current);
+  };
+
+  const extendRest = () => {
+    const endsAt = (restEndsAt ?? Date.now()) + 30000;
+    setRestEndsAt(endsAt);
+    scheduleRestAlert((endsAt - Date.now()) / 1000, nextUp.current);
+  };
+
+  const skipRest = () => {
+    setRestEndsAt(null);
+    cancelRestAlert();
+  };
+
+  /** Copies the previous set's weight and reps into this one: the most common edit. */
+  const copyPrevious = (set: WorkoutSet, previous: WorkoutSet | undefined) => {
+    if (!previous || set.completedAt) return;
+    Haptics.selectionAsync();
+    setSets((prev) => prev.map((s) => (s.id === set.id ? { ...s, weight: previous.weight, reps: previous.reps } : s)));
+    updateSet(db, set.id, { weight: previous.weight, reps: previous.reps });
   };
 
   /**
@@ -174,6 +213,7 @@ export default function WorkoutScreen() {
       const finished = sets.filter((s) => s.completedAt);
       const prNames = [...new Set(finished.filter((s) => prSets.has(s.id)).map((s) => exercises.get(s.exerciseId)?.name ?? ''))];
       await finishWorkout(db, workoutId!);
+      skipRest();
       if (finished.length === 0) {
         close();
         return;
@@ -228,18 +268,13 @@ export default function WorkoutScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + space.sm }]}>
-        <Pressable onPress={() => close()} hitSlop={12}>
+        <Pressable onPress={() => close()} hitSlop={12} accessibilityRole="button" accessibilityHint="Keeps the workout running">
           <Text style={styles.headerLink}>Minimize</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>
-          {done}/{sets.length} sets
-        </Text>
-        <Pressable onPress={finish} hitSlop={12}>
+        <ProgressRing done={done} total={sets.length} />
+        <Pressable onPress={finish} hitSlop={12} accessibilityRole="button" accessibilityLabel="Finish workout">
           <Text style={[styles.headerLink, { color: colors.accent, fontWeight: '700' }]}>Finish</Text>
         </Pressable>
-      </View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${sets.length ? (done / sets.length) * 100 : 0}%` }]} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 160 }} keyboardShouldPersistTaps="handled">
@@ -248,7 +283,12 @@ export default function WorkoutScreen() {
           const left = g.sets.filter((s) => !s.completedAt).length;
           return (
             <Card key={`${g.exerciseId}-${g.sets[0].id}`} style={{ marginBottom: space.md }}>
-              <Pressable onPress={() => router.push(`/exercise/${g.exerciseId}`)} style={styles.exHeader}>
+              <Pressable
+                onPress={() => router.push(`/exercise/${g.exerciseId}`)}
+                style={styles.exHeader}
+                accessibilityRole="button"
+                accessibilityHint="Shows how to do it"
+              >
                 {e && <ExerciseThumb exercise={e} size={52} />}
                 <View style={{ flex: 1, marginLeft: space.md }}>
                   <Text style={[type.title, { fontSize: 19 }]}>{e?.name}</Text>
@@ -261,7 +301,7 @@ export default function WorkoutScreen() {
               </Text>
               <View style={styles.columns}>
                 <Text style={[styles.colLabel, { width: 28 }]}>SET</Text>
-                <Pressable onPress={toggleUnits} style={{ flex: 1 }} accessibilityLabel="Switch between kilograms and pounds">
+                <Pressable onPress={toggleUnits} style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel="Switch between kilograms and pounds">
                   <Text style={[styles.colLabel, { color: colors.accent }]}>{settings?.units.toUpperCase()} ⇄</Text>
                 </Pressable>
                 <Text style={[styles.colLabel, { flex: 1 }]}>REPS</Text>
@@ -269,12 +309,25 @@ export default function WorkoutScreen() {
                 <View style={{ width: TAP }} />
               </View>
               {g.sets.map((s, i) => (
-                <SetRow key={s.id} index={i + 1} set={s} pr={prSets.has(s.id)} onEdit={edit} onToggle={() => toggle(s)} />
+                <SetRow
+                  key={s.id}
+                  index={i + 1}
+                  set={s}
+                  units={settings?.units ?? 'lb'}
+                  pr={prSets.has(s.id)}
+                  onEdit={edit}
+                  onToggle={() => toggle(s)}
+                  onCopyPrevious={i > 0 ? () => copyPrevious(s, g.sets[i - 1]) : undefined}
+                />
               ))}
-              <Pressable onPress={async () => {
-                await addSet(db, workoutId!, g.sets.at(-1)!);
-                await reload(workoutId!);
-              }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Add a set of ${e?.name ?? 'this exercise'}`}
+                onPress={async () => {
+                  await addSet(db, workoutId!, g.sets.at(-1)!);
+                  await reload(workoutId!);
+                }}
+              >
                 <Text style={styles.addSet}>+ Add set</Text>
               </Pressable>
             </Card>
@@ -286,14 +339,20 @@ export default function WorkoutScreen() {
         <View style={[styles.rest, { paddingBottom: insets.bottom + space.sm }]}>
           <View style={{ flex: 1 }}>
             <Text style={type.label}>REST</Text>
-            <Text style={[type.number, { fontSize: 34 }]}>{formatClock(restLeft)}</Text>
+            <Text
+              style={[type.number, { fontSize: 34 }]}
+              maxFontSizeMultiplier={1.3}
+              accessibilityLabel={`Rest, ${Math.ceil(restLeft)} seconds left`}
+            >
+              {formatClock(restLeft)}
+            </Text>
             {restNote && (
               <Text style={[styles.restNote, !restNote.startsWith('That looked') && { color: colors.warning }]}>{restNote}</Text>
             )}
           </View>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Button title="+30s" variant="secondary" onPress={() => setRestEndsAt((t) => (t ?? Date.now()) + 30000)} />
-            <Button title="Skip" onPress={() => setRestEndsAt(null)} />
+            <Button title="+30s" variant="secondary" onPress={extendRest} />
+            <Button title="Skip" onPress={skipRest} />
           </View>
         </View>
       )}
@@ -304,15 +363,19 @@ export default function WorkoutScreen() {
 function SetRow({
   index,
   set,
+  units,
   pr,
   onEdit,
   onToggle,
+  onCopyPrevious,
 }: {
   index: number;
   set: WorkoutSet;
+  units: string;
   pr: boolean;
   onEdit: (id: number, field: 'weight' | 'reps' | 'rir', value: number | null) => void;
   onToggle: () => void;
+  onCopyPrevious?: () => void;
 }) {
   const done = !!set.completedAt;
   const parse = (t: string) => (t.trim() === '' || Number.isNaN(Number(t)) ? null : Number(t));
@@ -332,10 +395,23 @@ function SetRow({
   const nextRir = () => onEdit(set.id, 'rir', set.rir == null ? set.targetRir : set.rir >= 4 ? 0 : set.rir + 1);
   return (
     <View style={styles.setRow}>
-      <Text style={[styles.setIndex, pr && { color: colors.success }]}>{pr ? '★' : index}</Text>
+      <Pressable
+        onPress={onCopyPrevious}
+        disabled={!onCopyPrevious || done}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`Set ${index}${pr ? ', personal record' : ''}`}
+        accessibilityHint={onCopyPrevious && !done ? 'Copies weight and reps from the set above' : undefined}
+      >
+        <Text style={[styles.setIndex, pr && { color: colors.success }]} maxFontSizeMultiplier={1.3}>
+          {pr ? '★' : index}
+        </Text>
+      </Pressable>
       <TextInput
         style={[styles.input, done && styles.inputDone]}
         keyboardType="decimal-pad"
+        accessibilityLabel={`Set ${index} weight in ${units}`}
+        maxFontSizeMultiplier={1.3}
         value={weightText}
         placeholder="—"
         placeholderTextColor={colors.textMuted}
@@ -348,6 +424,8 @@ function SetRow({
       <TextInput
         style={[styles.input, done && styles.inputDone]}
         keyboardType="number-pad"
+        accessibilityLabel={`Set ${index} reps`}
+        maxFontSizeMultiplier={1.3}
         value={repsText}
         placeholder="—"
         placeholderTextColor={colors.textMuted}
@@ -357,12 +435,19 @@ function SetRow({
         }}
         selectTextOnFocus
       />
-      <Pressable onPress={nextRir} style={styles.rir} accessibilityLabel="Reps in reserve, tap to change">
+      <Pressable
+        onPress={nextRir}
+        style={styles.rir}
+        accessibilityRole="button"
+        accessibilityLabel={`Set ${index} reps in reserve: ${set.rir ?? 'not set'}`}
+        accessibilityHint="Tap to change"
+      >
         <Text style={styles.rirText}>{set.rir ?? '–'}</Text>
       </Pressable>
       <Pressable
         onPress={onToggle}
         accessibilityRole="checkbox"
+        accessibilityLabel={`Complete set ${index}`}
         accessibilityState={{ checked: done }}
         style={[styles.check, done && { backgroundColor: pr ? colors.success : colors.accent, borderColor: 'transparent' }]}
       >
@@ -393,9 +478,6 @@ const styles = StyleSheet.create({
     paddingBottom: space.sm,
   },
   headerLink: { color: colors.textMuted, fontSize: 17 },
-  headerTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
-  progressTrack: { height: 4, backgroundColor: colors.surfaceRaised },
-  progressFill: { height: 4, backgroundColor: colors.accent },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
   exHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },
   doneBadge: { color: colors.success, fontSize: 22, fontWeight: '800' },
@@ -408,7 +490,7 @@ const styles = StyleSheet.create({
     // Web inputs have an intrinsic width that would push the row off screen.
     minWidth: 0,
     flexBasis: 0,
-    height: 48,
+    minHeight: 48,
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceRaised,
     color: colors.text,

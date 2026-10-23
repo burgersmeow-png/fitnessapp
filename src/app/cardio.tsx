@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -6,7 +5,9 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, type MuscleFills } from '../components/BodyMap';
+import { Icon } from '../components/Icon';
 import { Button, SectionLabel } from '../components/ui';
+import { MUSCLE_LABELS } from '../lib/format';
 import { CARDIO_BY_TYPE, CARDIO_KINDS, EFFORTS, type CardioType } from '../lib/cardio';
 import { loadSettings, saveCardio } from '../lib/db';
 import { useFocusData } from '../lib/useData';
@@ -46,7 +47,7 @@ export default function CardioScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
           <Text style={styles.headerLink}>Cancel</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Log cardio</Text>
@@ -59,13 +60,15 @@ export default function CardioScreen() {
             return (
               <Pressable
                 key={k.type}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
                 onPress={() => {
                   Haptics.selectionAsync();
                   setKind(k.type);
                 }}
                 style={[styles.kind, on && styles.kindOn]}
               >
-                <Ionicons name={k.icon as keyof typeof Ionicons.glyphMap} size={28} color={on ? colors.accentText : colors.text} />
+                <Icon name={k.icon} size={28} color={on ? colors.accentText : colors.text} />
                 <Text style={[styles.kindLabel, on && { color: colors.accentText }]}>{k.label}</Text>
               </Pressable>
             );
@@ -73,14 +76,14 @@ export default function CardioScreen() {
         </View>
 
         <View style={styles.mapCard}>
-          <BodyMap fills={fills} height={150} />
+          <BodyMap fills={fills} height={150} label={`${selected.label} works your ${Object.keys(selected.load).map((m) => MUSCLE_LABELS[m as Muscle]).join(', ')}`} />
           <Text style={[type.label, { marginTop: space.sm }]}>MUSCLES THIS WORKS</Text>
         </View>
 
         <SectionLabel>Duration</SectionLabel>
         <View style={styles.row}>
           {DURATIONS.map((d) => (
-            <Pressable key={d} onPress={() => setMinutes(d)} style={[styles.pill, minutes === d && styles.pillOn]}>
+            <Pressable key={d} accessibilityRole="button" accessibilityState={{ selected: minutes === d }} onPress={() => setMinutes(d)} style={[styles.pill, minutes === d && styles.pillOn]}>
               <Text style={[styles.pillText, minutes === d && { color: colors.accentText }]}>{d} min</Text>
             </Pressable>
           ))}
@@ -103,7 +106,7 @@ export default function CardioScreen() {
         <SectionLabel>Effort</SectionLabel>
         <View style={styles.row}>
           {EFFORTS.map((e) => (
-            <Pressable key={e.rpe} onPress={() => setRpe(e.rpe)} style={[styles.pill, styles.effort, rpe === e.rpe && styles.pillOn]}>
+            <Pressable key={e.rpe} accessibilityRole="button" accessibilityState={{ selected: rpe === e.rpe }} onPress={() => setRpe(e.rpe)} style={[styles.pill, styles.effort, rpe === e.rpe && styles.pillOn]}>
               <Text style={[styles.pillText, rpe === e.rpe && { color: colors.accentText }]}>{e.label}</Text>
             </Pressable>
           ))}

@@ -1,7 +1,7 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { EXERCISE_MEDIA } from '../lib/exerciseMedia';
+import { Icon } from './Icon';
 import { colors, radius, space } from '../lib/theme';
 
 const HOLD_MS = 1100;
@@ -39,7 +39,7 @@ export function ExerciseDemo({ exerciseId }: { exerciseId: string }) {
         <Animated.Image source={end} style={[styles.image, StyleSheet.absoluteFill, { opacity: fade }]} resizeMode="cover" />
       )}
       <View style={styles.badge}>
-        <Ionicons name={playing ? 'pause' : 'play'} size={12} color="#FFFFFF" />
+        <Icon name={playing ? 'pause' : 'play'} size={12} color="#FFFFFF" />
         <Text style={styles.badgeText}>{frame === 0 ? 'Start' : 'Finish'}</Text>
       </View>
       <View style={styles.dots}>

@@ -1,6 +1,7 @@
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
+import { ErrorState } from '../components/ui';
 import { DATABASE_NAME, migrate } from '../lib/db';
 import { colors } from '../lib/theme';
 
@@ -15,6 +16,19 @@ const theme = {
     border: colors.border,
   },
 };
+
+/** Catches anything a screen throws (including a failed database load) and offers a retry. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <>
+      <StatusBar style="light" />
+      <ErrorState
+        message={`Your workouts are safe on this phone. ${error.message ? `(${error.message})` : ''}`.trim()}
+        onRetry={retry}
+      />
+    </>
+  );
+}
 
 export default function RootLayout() {
   return (

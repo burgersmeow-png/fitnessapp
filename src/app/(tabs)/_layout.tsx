@@ -1,13 +1,11 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ColorValue } from 'react-native';
+import { Icon, type IconName } from '../../components/Icon';
 import { Tabs } from 'expo-router/js-tabs';
 import { colors } from '../../lib/theme';
 
-type IconName = keyof typeof Ionicons.glyphMap;
-
 const icon = (name: IconName) =>
   function TabIcon({ color, size }: { color: ColorValue; size: number }) {
-    return <Ionicons name={name} color={color as string} size={size} />;
+    return <Icon name={name} color={color} size={size} />;
   };
 
 export default function TabsLayout() {
@@ -22,10 +20,10 @@ export default function TabsLayout() {
         headerShadowVisible: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Today', headerShown: false, tabBarIcon: icon('flash') }} />
-      <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: icon('calendar') }} />
-      <Tabs.Screen name="exercises" options={{ title: 'Exercises', tabBarIcon: icon('barbell') }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('options') }} />
+      <Tabs.Screen name="index" options={{ title: 'Today', headerShown: false, tabBarIcon: icon('today') }} />
+      <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: icon('history') }} />
+      <Tabs.Screen name="exercises" options={{ title: 'Exercises', tabBarIcon: icon('exercises') }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('settings') }} />
     </Tabs>
   );
 }

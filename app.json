@@ -24,7 +24,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-notifications"
     ],
     "scheme": "liftlab",
     "backgroundColor": "#0E0F12"

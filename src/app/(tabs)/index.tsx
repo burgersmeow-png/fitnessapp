@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -7,7 +6,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
-import { SectionLabel } from '../../components/ui';
+import { Icon, type IconName } from '../../components/Icon';
+import { SectionLabel, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, cardioFatigue, type CardioSession } from '../../lib/cardio';
 import { activeWorkoutId, loadCardio, loadExercises, loadHistory, loadSettings, startWorkout } from '../../lib/db';
 import { MUSCLE_LABELS } from '../../lib/format';
@@ -57,7 +57,7 @@ export default function TodayScreen() {
     };
   }, [seed]);
 
-  if (!data) return <View style={styles.screen} />;
+  if (!data) return <Loading />;
   const { workout, exercises, settings, activeId, weekSessions, lastCardio } = data;
   const totalSets = workout.exercises.reduce((n, p) => n + p.sets, 0);
   const fresh = [...ALL_MUSCLES].sort((a, b) => workout.recovery[b] - workout.recovery[a]);
@@ -88,23 +88,24 @@ export default function TodayScreen() {
           />
         </View>
         <View style={styles.heroStats}>
-          <HeroStat icon="time-outline" value={`${settings.minutes} min`} />
-          <HeroStat icon="barbell-outline" value={`${workout.exercises.length} exercises`} />
-          <HeroStat icon="layers-outline" value={`${totalSets} sets`} />
-          <HeroStat icon="flag-outline" value={GOAL_LABEL[settings.goal]} />
+          <HeroStat icon="time" value={`${settings.minutes} min`} />
+          <HeroStat icon="barbell" value={`${workout.exercises.length} exercises`} />
+          <HeroStat icon="sets" value={`${totalSets} sets`} />
+          <HeroStat icon="goal" value={GOAL_LABEL[settings.goal]} />
         </View>
         <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
-          <Pressable onPress={begin} style={({ pressed }) => [styles.heroButton, pressed && { opacity: 0.85 }]}>
-            <Ionicons name="play" size={18} color={colors.accent} />
+          <Pressable onPress={begin} accessibilityRole="button" style={({ pressed }) => [styles.heroButton, pressed && { opacity: 0.85 }]}>
+            <Icon name="play" size={18} color={colors.accent} />
             <Text style={styles.heroButtonText}>{activeId != null ? 'Resume' : 'Start workout'}</Text>
           </Pressable>
           {activeId == null && (
             <Pressable
               onPress={() => setSeed((s) => s + 1)}
+              accessibilityRole="button"
               accessibilityLabel="Generate a different workout"
               style={({ pressed }) => [styles.heroIconButton, pressed && { opacity: 0.7 }]}
             >
-              <Ionicons name="shuffle" size={22} color="#FFFFFF" />
+              <Icon name="shuffle" size={22} color="#FFFFFF" />
             </Pressable>
           )}
         </View>
@@ -114,7 +115,7 @@ export default function TodayScreen() {
       {workout.exercises.map((p) => {
         const e = exercises.get(p.exerciseId)!;
         return (
-          <Pressable key={p.exerciseId} onPress={() => router.push(`/exercise/${p.exerciseId}`)} style={styles.row}>
+          <Pressable key={p.exerciseId} accessibilityRole="button" accessibilityHint="Shows how to do it" onPress={() => router.push(`/exercise/${p.exerciseId}`)} style={styles.row}>
             <ExerciseThumb exercise={e} size={64} />
             <View style={{ flex: 1, marginLeft: space.md }}>
               <Text style={styles.rowTitle}>{e.name}</Text>
@@ -131,14 +132,14 @@ export default function TodayScreen() {
                 </Text>
               ) : null}
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            <Icon name="chevron" size={16} color={colors.textMuted} />
           </Pressable>
         );
       })}
 
-      <Pressable onPress={() => router.push('/cardio')} style={({ pressed }) => [styles.cardioCard, pressed && { opacity: 0.8 }]}>
+      <Pressable onPress={() => router.push('/cardio')} accessibilityRole="button" style={({ pressed }) => [styles.cardioCard, pressed && { opacity: 0.8 }]}>
         <View style={styles.cardioIcon}>
-          <Ionicons name="pulse" size={24} color={colors.accent} />
+          <Icon name="pulse" size={24} color={colors.accent} />
         </View>
         <View style={{ flex: 1, marginLeft: space.md }}>
           <Text style={styles.rowTitle}>Log cardio</Text>
@@ -148,13 +149,17 @@ export default function TodayScreen() {
               : 'Runs, rides, rowing and intervals count toward recovery'}
           </Text>
         </View>
-        <Ionicons name="add-circle" size={28} color={colors.accent} />
+        <Icon name="add" size={28} color={colors.accent} />
       </Pressable>
 
       <SectionLabel>Muscle recovery</SectionLabel>
       <View style={styles.card}>
         <View style={{ alignItems: 'center' }}>
-          <BodyMap fills={recoveryFills(workout.recovery)} height={230} />
+          <BodyMap
+            fills={recoveryFills(workout.recovery)}
+            height={230}
+            label={recoveryLabel(workout.recovery)}
+          />
           <View style={styles.sideLabels}>
             <Text style={type.label}>FRONT</Text>
             <Text style={type.label}>BACK</Text>
@@ -178,7 +183,7 @@ export default function TodayScreen() {
       </View>
 
       <View style={[styles.card, styles.weekCard]}>
-        <Ionicons name="flame" size={28} color={colors.accent} />
+        <Icon name="flame" size={28} color={colors.accent} />
         <View style={{ marginLeft: space.md, flex: 1 }}>
           <Text style={styles.rowTitle}>
             {weekSessions} {weekSessions === 1 ? 'workout' : 'workouts'} this week
@@ -190,10 +195,10 @@ export default function TodayScreen() {
   );
 }
 
-function HeroStat({ icon, value }: { icon: keyof typeof Ionicons.glyphMap; value: string }) {
+function HeroStat({ icon, value }: { icon: IconName; value: string }) {
   return (
     <View style={styles.heroStat}>
-      <Ionicons name={icon} size={14} color="rgba(255,255,255,0.85)" />
+      <Icon name={icon} size={14} color="rgba(255,255,255,0.85)" />
       <Text style={styles.heroStatText}>{value}</Text>
     </View>
   );
@@ -289,3 +294,11 @@ const styles = StyleSheet.create({
   },
   weekCard: { flexDirection: 'row', alignItems: 'center', marginTop: space.md },
 });
+
+/** Spoken summary of the recovery map: the muscles that still need rest. */
+function recoveryLabel(recovery: GeneratedWorkout['recovery']): string {
+  const tired = ALL_MUSCLES.filter((m) => recovery[m] < 0.8)
+    .sort((a, b) => recovery[a] - recovery[b])
+    .map((m) => `${MUSCLE_LABELS[m]} ${Math.round(recovery[m] * 100)}%`);
+  return tired.length ? `Muscle recovery. Still recovering: ${tired.join(', ')}` : 'Muscle recovery. Every muscle is fresh.';
+}

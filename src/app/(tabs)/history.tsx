@@ -1,7 +1,7 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSQLiteContext } from 'expo-sqlite';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
-import { Card } from '../../components/ui';
+import { Icon } from '../../components/Icon';
+import { Card, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, EFFORTS, type CardioSession } from '../../lib/cardio';
 import { loadCardio, loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
@@ -37,7 +37,7 @@ export default function HistoryScreen() {
     cardio: await loadCardio(db),
     settings: await loadSettings(db),
   }));
-  if (!data) return <View style={styles.screen} />;
+  if (!data) return <Loading />;
   const { workouts, cardio, settings } = data;
   const entries: Entry[] = [
     ...workouts.map((w) => ({ kind: 'lift' as const, at: w.startedAt, workout: w })),
@@ -54,12 +54,12 @@ export default function HistoryScreen() {
       ListHeaderComponent={
         <View style={{ flexDirection: 'row', gap: space.md }}>
           <Card style={{ flex: 1 }}>
-            <Ionicons name="flame" size={20} color={colors.accent} />
+            <Icon name="flame" size={20} color={colors.accent} />
             <Text style={type.number}>{streak}</Text>
             <Text style={type.label}>WEEK STREAK</Text>
           </Card>
           <Card style={{ flex: 1 }}>
-            <Ionicons name="trophy" size={20} color={colors.warning} />
+            <Icon name="trophy" size={20} color={colors.warning} />
             <Text style={type.number}>{entries.length}</Text>
             <Text style={type.label}>SESSIONS</Text>
           </Card>
@@ -67,7 +67,7 @@ export default function HistoryScreen() {
       }
       ListEmptyComponent={
         <View style={{ alignItems: 'center', marginTop: space.xl }}>
-          <Ionicons name="barbell" size={56} color={colors.border} />
+          <Icon name="exercises" size={56} color={colors.border} />
           <Text style={[type.title, { marginTop: space.md }]}>No workouts yet</Text>
           <Text style={[type.body, { color: colors.textMuted, textAlign: 'center', marginTop: space.xs }]}>
             Finish your first workout and it shows up here.
@@ -82,7 +82,7 @@ export default function HistoryScreen() {
           return (
             <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={styles.icon}>
-                <Ionicons name={(kind?.icon ?? 'pulse') as keyof typeof Ionicons.glyphMap} size={22} color={colors.accent} />
+                <Icon name={kind?.icon ?? 'pulse'} size={22} color={colors.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: space.md }}>
                 <Text style={type.title}>{kind?.label}</Text>
@@ -97,7 +97,7 @@ export default function HistoryScreen() {
         return (
           <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={styles.icon}>
-              <Ionicons name="barbell" size={22} color={colors.accent} />
+              <Icon name="exercises" size={22} color={colors.accent} />
             </View>
             <View style={{ flex: 1, marginLeft: space.md }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>

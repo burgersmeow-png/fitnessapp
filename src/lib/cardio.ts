@@ -5,21 +5,21 @@ export type CardioType = 'run' | 'walk' | 'ride' | 'row' | 'swim' | 'elliptical'
 export interface CardioKind {
   type: CardioType;
   label: string;
-  /** Ionicons glyph name. */
-  icon: string;
+  /** Icon name from components/Icon. */
+  icon: 'run' | 'walk' | 'ride' | 'row' | 'swim' | 'elliptical' | 'intervals';
   /** How much each muscle works, 0 to 1. */
   load: Partial<Record<Muscle, number>>;
   hasDistance: boolean;
 }
 
 export const CARDIO_KINDS: CardioKind[] = [
-  { type: 'run', label: 'Run', icon: 'walk', hasDistance: true, load: { quads: 1, hamstrings: 0.8, calves: 1, glutes: 0.7, core: 0.3 } },
-  { type: 'walk', label: 'Walk', icon: 'footsteps', hasDistance: true, load: { calves: 0.5, quads: 0.3, glutes: 0.3 } },
-  { type: 'ride', label: 'Ride', icon: 'bicycle', hasDistance: true, load: { quads: 1, glutes: 0.6, calves: 0.4, hamstrings: 0.4 } },
-  { type: 'row', label: 'Row', icon: 'boat', hasDistance: true, load: { back: 0.9, quads: 0.7, glutes: 0.5, biceps: 0.4, hamstrings: 0.4, core: 0.4 } },
-  { type: 'swim', label: 'Swim', icon: 'water', hasDistance: true, load: { back: 0.8, shoulders: 0.9, triceps: 0.4, core: 0.4 } },
-  { type: 'elliptical', label: 'Elliptical', icon: 'sync', hasDistance: false, load: { quads: 0.6, glutes: 0.5, calves: 0.4 } },
-  { type: 'intervals', label: 'Intervals', icon: 'flash', hasDistance: false, load: { quads: 0.9, glutes: 0.7, hamstrings: 0.6, calves: 0.6, core: 0.6, shoulders: 0.4 } },
+  { type: 'run', label: 'Run', icon: 'run', hasDistance: true, load: { quads: 1, hamstrings: 0.8, calves: 1, glutes: 0.7, core: 0.3 } },
+  { type: 'walk', label: 'Walk', icon: 'walk', hasDistance: true, load: { calves: 0.5, quads: 0.3, glutes: 0.3 } },
+  { type: 'ride', label: 'Ride', icon: 'ride', hasDistance: true, load: { quads: 1, glutes: 0.6, calves: 0.4, hamstrings: 0.4 } },
+  { type: 'row', label: 'Row', icon: 'row', hasDistance: true, load: { back: 0.9, quads: 0.7, glutes: 0.5, biceps: 0.4, hamstrings: 0.4, core: 0.4 } },
+  { type: 'swim', label: 'Swim', icon: 'swim', hasDistance: true, load: { back: 0.8, shoulders: 0.9, triceps: 0.4, core: 0.4 } },
+  { type: 'elliptical', label: 'Elliptical', icon: 'elliptical', hasDistance: false, load: { quads: 0.6, glutes: 0.5, calves: 0.4 } },
+  { type: 'intervals', label: 'Intervals', icon: 'intervals', hasDistance: false, load: { quads: 0.9, glutes: 0.7, hamstrings: 0.6, calves: 0.6, core: 0.6, shoulders: 0.4 } },
 ];
 
 export const CARDIO_BY_TYPE = new Map(CARDIO_KINDS.map((k) => [k.type, k]));

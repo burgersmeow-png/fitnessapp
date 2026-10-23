@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radius, space, TAP, type } from '../lib/theme';
 
@@ -42,6 +42,8 @@ export function Button({
 export function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
       onPress={() => {
         Haptics.selectionAsync();
         onPress();
@@ -53,8 +55,28 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
   );
 }
 
+/** Shown while a screen's data loads, instead of a blank screen. */
+export function Loading() {
+  return (
+    <View style={styles.centered} accessibilityLabel="Loading">
+      <ActivityIndicator color={colors.accent} size="large" />
+    </View>
+  );
+}
+
+/** A friendly failure with a way out, never a raw error. */
+export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <View style={[styles.centered, { padding: space.lg }]}>
+      <Text style={[type.title, { textAlign: 'center' }]}>Something went wrong</Text>
+      <Text style={[type.body, { color: colors.textMuted, textAlign: 'center', marginTop: space.sm }]}>{message}</Text>
+      {onRetry && <Button title="Try again" onPress={onRetry} style={{ marginTop: space.lg, alignSelf: 'stretch' }} />}
+    </View>
+  );
+}
+
 export function SectionLabel({ children }: { children: ReactNode }) {
-  return <Text style={[type.label, { marginTop: space.lg, marginBottom: space.sm }]}>{String(children).toUpperCase()}</Text>;
+  return <Text accessibilityRole="header" style={[type.label, { marginTop: space.lg, marginBottom: space.sm }]}>{String(children).toUpperCase()}</Text>;
 }
 
 const styles = StyleSheet.create({
@@ -82,5 +104,7 @@ const styles = StyleSheet.create({
     marginRight: space.sm,
     marginBottom: space.sm,
   },
-  chipText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  // Bold so white on the accent meets WCAG AA for large text (3:1).
+  chipText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
 });

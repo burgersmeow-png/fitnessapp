@@ -3,7 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BodyMap, type MuscleFills } from '../../components/BodyMap';
 import { ExerciseDemo } from '../../components/ExerciseDemo';
-import { Card, SectionLabel } from '../../components/ui';
+import { Card, SectionLabel, Loading } from '../../components/ui';
 import { loadExercises, loadHistory, loadSettings } from '../../lib/db';
 import { formatDate, MUSCLE_LABELS } from '../../lib/format';
 import { EXERCISE_MEDIA, EXTRA_INSTRUCTIONS } from '../../lib/exerciseMedia';
@@ -28,7 +28,7 @@ export default function ExerciseScreen() {
     return { exercise: exercises.find((e) => e.id === id), sessions, units: settings.units };
   }, [id]);
 
-  if (!data?.exercise) return <View style={styles.screen} />;
+  if (!data?.exercise) return <Loading />;
   const { exercise, sessions, units } = data;
   const best = Math.max(0, ...sessions.map((s) => s.e1rm));
   const recent = sessions.slice(-12);
@@ -60,7 +60,11 @@ export default function ExerciseScreen() {
 
       <SectionLabel>Muscles worked</SectionLabel>
       <Card style={{ alignItems: 'center' }}>
-        <BodyMap fills={fills} height={200} />
+        <BodyMap
+          fills={fills}
+          height={200}
+          label={`Works ${exercise.primary.map((m) => MUSCLE_LABELS[m]).join(', ')}${exercise.secondary.length ? `, and helps ${exercise.secondary.map((m) => MUSCLE_LABELS[m]).join(', ')}` : ''}`}
+        />
         <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.sm }}>
           <Text style={[type.label, { color: colors.accent }]}>● PRIMARY</Text>
           <Text style={[type.label, { color: colors.accent, opacity: 0.6 }]}>● SECONDARY</Text>

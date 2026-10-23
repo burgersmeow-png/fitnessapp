@@ -1,6 +1,6 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Chip, SectionLabel } from '../../components/ui';
+import { Chip, SectionLabel, Loading } from '../../components/ui';
 import { loadSettings, saveSettings } from '../../lib/db';
 import { colors, space } from '../../lib/theme';
 import { ALL_EQUIPMENT, type Goal, type Settings } from '../../lib/types';
@@ -16,7 +16,7 @@ const LENGTHS = [30, 45, 60, 75];
 export default function SettingsScreen() {
   const db = useSQLiteContext();
   const [settings, reload] = useFocusData(() => loadSettings(db));
-  if (!settings) return <View style={styles.screen} />;
+  if (!settings) return <Loading />;
 
   const update = async (patch: Partial<Settings>) => {
     await saveSettings(db, { ...settings, ...patch });

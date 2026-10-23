@@ -49,7 +49,7 @@ export default function ExercisesScreen() {
         keyExtractor={(e) => e.id}
         contentContainerStyle={{ paddingHorizontal: space.md, paddingBottom: space.xl }}
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => router.push(`/exercise/${item.id}`)}>
+          <Pressable style={styles.row} accessibilityRole="button" onPress={() => router.push(`/exercise/${item.id}`)}>
             <ExerciseThumb exercise={item} size={52} />
             <View style={{ flex: 1, marginLeft: space.md }}>
               <Text style={styles.name}>{item.name}</Text>

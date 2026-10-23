@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import Svg, { Ellipse, G, Path, Rect } from 'react-native-svg';
 import { colors } from '../lib/theme';
 import type { Muscle } from '../lib/types';
@@ -80,6 +81,7 @@ export function BodyMap({
   skin = SKIN,
   idle = IDLE,
   region = 'full',
+  label,
 }: {
   fills: MuscleFills;
   height?: number;
@@ -89,21 +91,32 @@ export function BodyMap({
   idle?: string;
   /** Zoom to part of the body, for small tiles. */
   region?: 'full' | 'upper' | 'lower';
+  /** What the map shows, for VoiceOver. Without one the map is decorative. */
+  label?: string;
 }) {
   const p = { fills, skin, idle };
   const [y0, h] = region === 'upper' ? [28, 100] : region === 'lower' ? [100, 125] : [0, 230];
   const both = sides === 'both';
   const width = both ? 240 : 120;
   return (
-    <Svg width={(height / h) * (region === 'full' ? width : h)} height={height} viewBox={`${region === 'full' ? 0 : (width - h) / 2} ${y0} ${region === 'full' ? width : h} ${h}`}>
-      {(both || sides === 'front') && <Front {...p} />}
-      {both && (
-        <G x={120}>
-          <Back {...p} />
-        </G>
-      )}
-      {sides === 'back' && <Back {...p} />}
-    </Svg>
+    <View
+      accessible={!!label}
+      accessibilityRole={label ? 'image' : undefined}
+      accessibilityLabel={label}
+      accessibilityElementsHidden={!label}
+      importantForAccessibility={label ? 'yes' : 'no-hide-descendants'}
+    >
+      <Svg
+        width={(height / h) * (region === 'full' ? width : h)} height={height} viewBox={`${region === 'full' ? 0 : (width - h) / 2} ${y0} ${region === 'full' ? width : h} ${h}`}>
+        {(both || sides === 'front') && <Front {...p} />}
+        {both && (
+          <G x={120}>
+            <Back {...p} />
+          </G>
+        )}
+        {sides === 'back' && <Back {...p} />}
+      </Svg>
+    </View>
   );
 }
 
