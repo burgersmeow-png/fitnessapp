@@ -12,6 +12,8 @@ import { BADGES, weekProgress } from '../../lib/habits';
 import { recapContent, recapMonth, recapWeek, weekRecapContent } from '../../lib/recap';
 import { startOfWeek } from '../../lib/social';
 import { prHistory } from '../../lib/records';
+import { calendarCardContent, trainingCalendar } from '../../lib/trainingCalendar';
+import { TrainingCalendarCard } from '../../components/TrainingCalendarCard';
 import type { CardContent } from '../../lib/shareCard';
 import { colors, radius, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
@@ -22,7 +24,7 @@ type Entry = { kind: 'lift'; at: string; workout: WorkoutSummary } | { kind: 'ca
 export default function HistoryScreen() {
   const db = useSQLiteContext();
   const params = useLocalSearchParams<{ share?: string }>();
-  const [card, setCard] = useState<{ content: CardContent; week: boolean } | null>(null);
+  const [card, setCard] = useState<{ content: CardContent; kind: 'week' | 'month' | 'calendar' } | null>(null);
   const [data] = useFocusData(async () => {
     const settings = await loadSettings(db);
     const [workouts, cardio, badges] = await Promise.all([loadWorkouts(db), loadCardio(db), checkBadges(db, settings.weeklyGoal)]);
@@ -46,6 +48,7 @@ export default function HistoryScreen() {
   const monthName = month.toLocaleDateString(undefined, { month: 'long' });
   const trainedThisMonth = entries.some((e) => new Date(e.at).getMonth() === month.getMonth() && new Date(e.at).getFullYear() === month.getFullYear());
 
+  const calendar = trainingCalendar(workouts.map((w) => w.startedAt), cardio.map((c) => c.startedAt), new Date());
   const week = recapWeek(new Date(), entries.map((e) => e.at));
   const weekEnd = week.getTime() + 7 * 864e5;
   const trainedThisWeek = entries.some((e) => Date.parse(e.at) >= week.getTime() && Date.parse(e.at) < weekEnd);
@@ -57,7 +60,7 @@ export default function HistoryScreen() {
     const names = new Map(exercises.map((e) => [e.id, e.name]));
     const r = { workouts, cardio, history, prs: prHistory(history, 1000), name: (id: string) => names.get(id) ?? id, units: settings.units };
     const content = which === 'week' ? weekRecapContent({ ...r, week }) : recapContent({ ...r, month });
-    if (content) setCard({ content, week: which === 'week' });
+    if (content) setCard({ content, kind: which });
   };
   shareRef.current = share;
 
@@ -95,6 +98,9 @@ export default function HistoryScreen() {
             </Card>
           </Pressable>
         </View>
+        {entries.length > 0 && (
+          <TrainingCalendarCard calendar={calendar} onShare={() => setCard({ content: calendarCardContent(calendar), kind: 'calendar' })} />
+        )}
         <Pressable
           onPress={() => router.push('/progress')}
           accessibilityRole="button"
@@ -197,8 +203,8 @@ export default function HistoryScreen() {
     <ShareCardSheet
       content={card?.content ?? null}
       onClose={() => setCard(null)}
-      title={card?.week ? `Share your ${weekName}` : `Share your ${monthName}`}
-      fileName={card?.week ? 'liftlab-week.png' : 'liftlab-month.png'}
+      title={card?.kind === 'calendar' ? 'Share your calendar' : card?.kind === 'week' ? `Share your ${weekName}` : `Share your ${monthName}`}
+      fileName={`liftlab-${card?.kind ?? 'month'}.png`}
     />
     </>
   );

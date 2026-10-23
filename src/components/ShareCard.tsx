@@ -84,6 +84,37 @@ export const ShareCard = forwardRef<Svg, { content: CardContent; width: number }
         );
       })}
 
+      {content.grid && (() => {
+        const cols = content.grid.length;
+        const gap = 6;
+        const cell = (CARD_W - 2 * X - gap * (cols - 1)) / cols;
+        const top = 980;
+        return (
+          <G>
+            {content.grid.map((week, w) =>
+              week.map((level, d) =>
+                level < 0 ? null : (
+                  <Rect
+                    key={`${w}-${d}`}
+                    x={X + w * (cell + gap)}
+                    y={top + d * (cell + gap)}
+                    width={cell}
+                    height={cell}
+                    rx={6}
+                    fill={level > 0 ? colors.accent : colors.surfaceRaised}
+                    opacity={level === 1 ? 0.45 : 1}
+                  />
+                ),
+              ),
+            )}
+            <Rect x={X} y={top + 7 * (cell + gap) + 40} width={32} height={32} rx={6} fill={colors.accent} />
+            <Text x={X + 48} y={top + 7 * (cell + gap) + 66} fontSize={32} fill={colors.textMuted} fontFamily={FONT}>Lifted</Text>
+            <Rect x={X + 200} y={top + 7 * (cell + gap) + 40} width={32} height={32} rx={6} fill={colors.accent} opacity={0.45} />
+            <Text x={X + 248} y={top + 7 * (cell + gap) + 66} fontSize={32} fill={colors.textMuted} fontFamily={FONT}>Cardio</Text>
+          </G>
+        );
+      })()}
+
       {content.lines.map((l, i) => {
         const y = listTop + i * 150;
         return (
