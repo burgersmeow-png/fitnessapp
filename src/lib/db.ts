@@ -5,7 +5,26 @@ import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export const DATABASE_NAME = 'liftlab.db';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
+
+/*
+ * Units: weights are stored in kilograms and distances in kilometres. They are
+ * converted at this boundary to whatever the user picked in Settings, so
+ * switching between kg and lb never changes the underlying data.
+ */
+const LB_PER_KG = 2.20462262;
+const MI_PER_KM = 0.621371192;
+let units: Settings['units'] = DEFAULT_SETTINGS.units;
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+/** Stored kg to display units. */
+export const fromKg = (kg: number) => round1(units === 'lb' ? kg * LB_PER_KG : kg);
+/** Display units to stored kg. */
+export const toKg = (w: number) => (units === 'lb' ? w / LB_PER_KG : w);
+const fromKgOrNull = (kg: number | null) => (kg == null ? null : fromKg(kg));
+const toKgOrNull = (w: number | null | undefined) => (w == null ? null : toKg(w));
+const fromKm = (km: number | null) => (km == null ? null : round1(units === 'lb' ? km * MI_PER_KM : km));
+const toKm = (d: number | null) => (d == null ? null : units === 'lb' ? d / MI_PER_KM : d);
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
@@ -59,8 +78,17 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
       );
     `);
   }
+  if (version >= 1 && version < 3) {
+    // Before v3, weights and distances were stored in the display unit.
+    const saved = await loadSettings(db);
+    if (saved.units === 'lb') {
+      await db.runAsync('UPDATE sets SET weight = weight / ? WHERE weight IS NOT NULL', LB_PER_KG);
+      await db.runAsync('UPDATE cardio SET distance = distance / ? WHERE distance IS NOT NULL', MI_PER_KM);
+    }
+  }
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   await seedExercises(db);
+  units = (await loadSettings(db)).units;
 }
 
 async function seedExercises(db: SQLiteDatabase): Promise<void> {
@@ -105,6 +133,7 @@ export async function loadSettings(db: SQLiteDatabase): Promise<Settings> {
 }
 
 export async function saveSettings(db: SQLiteDatabase, settings: Settings): Promise<void> {
+  units = settings.units;
   await db.runAsync(
     "INSERT INTO settings (key, value) VALUES ('settings', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     JSON.stringify(settings),
@@ -127,7 +156,7 @@ export async function loadHistory(db: SQLiteDatabase, sinceDays?: number): Promi
   );
   return rows.map((r) => ({
     exerciseId: r.exercise_id,
-    weight: r.weight ?? 0,
+    weight: r.weight == null ? 0 : fromKg(r.weight),
     reps: r.reps ?? 0,
     rir: r.rir,
     completedAt: r.completed_at,
@@ -153,7 +182,7 @@ export async function startWorkout(db: SQLiteDatabase, plan: PlannedExercise[]):
         await db.runAsync(
           `INSERT INTO sets (workout_id, exercise_id, position, target_reps, target_rir, rest_seconds, weight, reps)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          workoutId, p.exerciseId, position++, p.targetReps, p.targetRir, p.restSeconds, p.suggestedWeight, p.targetReps,
+          workoutId, p.exerciseId, position++, p.targetReps, p.targetRir, p.restSeconds, toKgOrNull(p.suggestedWeight), p.targetReps,
         );
       }
     }
@@ -194,7 +223,7 @@ export async function loadWorkoutSets(db: SQLiteDatabase, workoutId: number): Pr
     targetReps: r.target_reps,
     targetRir: r.target_rir,
     restSeconds: r.rest_seconds,
-    weight: r.weight,
+    weight: fromKgOrNull(r.weight),
     reps: r.reps,
     rir: r.rir,
     completedAt: r.completed_at,
@@ -211,7 +240,7 @@ export async function updateSet(
   if (keys.length === 0) return;
   await db.runAsync(
     `UPDATE sets SET ${keys.map((k) => `${columns[k]} = ?`).join(', ')} WHERE id = ?`,
-    ...keys.map((k) => fields[k] ?? null),
+    ...keys.map((k) => (k === 'weight' ? toKgOrNull(fields.weight) : fields[k] ?? null)),
     id,
   );
 }
@@ -221,7 +250,7 @@ export async function addSet(db: SQLiteDatabase, workoutId: number, after: Worko
   await db.runAsync(
     `INSERT INTO sets (workout_id, exercise_id, position, target_reps, target_rir, rest_seconds, weight, reps)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    workoutId, after.exerciseId, after.position + 1, after.targetReps, after.targetRir, after.restSeconds, after.weight, after.reps,
+    workoutId, after.exerciseId, after.position + 1, after.targetReps, after.targetRir, after.restSeconds, toKgOrNull(after.weight), after.reps,
   );
 }
 
@@ -248,7 +277,7 @@ export interface WorkoutSummary {
 }
 
 export async function loadWorkouts(db: SQLiteDatabase): Promise<WorkoutSummary[]> {
-  return db.getAllAsync<WorkoutSummary>(
+  const rows = await db.getAllAsync<WorkoutSummary>(
     `SELECT w.id, w.started_at AS startedAt, w.finished_at AS finishedAt,
             COUNT(s.id) AS sets, COALESCE(SUM(s.weight * s.reps), 0) AS volume,
             GROUP_CONCAT(DISTINCT e.name) AS exercises
@@ -258,12 +287,13 @@ export async function loadWorkouts(db: SQLiteDatabase): Promise<WorkoutSummary[]
      WHERE w.finished_at IS NOT NULL
      GROUP BY w.id ORDER BY w.started_at DESC`,
   );
+  return rows.map((r) => ({ ...r, volume: fromKg(r.volume) }));
 }
 
 export async function saveCardio(db: SQLiteDatabase, c: CardioSession): Promise<void> {
   await db.runAsync(
     'INSERT INTO cardio (type, started_at, minutes, distance, rpe) VALUES (?, ?, ?, ?, ?)',
-    c.type, c.startedAt, c.minutes, c.distance, c.rpe,
+    c.type, c.startedAt, c.minutes, toKm(c.distance), c.rpe,
   );
 }
 
@@ -279,7 +309,7 @@ export async function loadCardio(db: SQLiteDatabase, sinceDays?: number): Promis
     type: r.type as CardioType,
     startedAt: r.started_at,
     minutes: r.minutes,
-    distance: r.distance,
+    distance: fromKm(r.distance),
     rpe: r.rpe,
   }));
 }

@@ -14,6 +14,7 @@ import {
   loadHistory,
   loadSettings,
   loadWorkoutSets,
+  saveSettings,
   updateSet,
   type WorkoutSet,
 } from '../lib/db';
@@ -157,6 +158,17 @@ export default function WorkoutScreen() {
       : `That was tough. Next sets lowered to ${next} ${units}.`;
   };
 
+  const toggleUnits = async () => {
+    if (!settings || workoutId == null) return;
+    const next = { ...settings, units: settings.units === 'kg' ? ('lb' as const) : ('kg' as const) };
+    await saveSettings(db, next);
+    setSettings(next);
+    // Personal bests are compared in display units, so convert them too.
+    const factor = next.units === 'lb' ? 2.20462262 : 1 / 2.20462262;
+    setPreviousBest((prev) => new Map([...prev].map(([k, v]) => [k, v * factor])));
+    await reload(workoutId);
+  };
+
   const finish = () => {
     const complete = async () => {
       const finished = sets.filter((s) => s.completedAt);
@@ -249,7 +261,9 @@ export default function WorkoutScreen() {
               </Text>
               <View style={styles.columns}>
                 <Text style={[styles.colLabel, { width: 28 }]}>SET</Text>
-                <Text style={[styles.colLabel, { flex: 1 }]}>{settings?.units.toUpperCase()}</Text>
+                <Pressable onPress={toggleUnits} style={{ flex: 1 }} accessibilityLabel="Switch between kilograms and pounds">
+                  <Text style={[styles.colLabel, { color: colors.accent }]}>{settings?.units.toUpperCase()} ⇄</Text>
+                </Pressable>
                 <Text style={[styles.colLabel, { flex: 1 }]}>REPS</Text>
                 <Text style={[styles.colLabel, { width: 52 }]}>RIR</Text>
                 <View style={{ width: TAP }} />
@@ -302,6 +316,19 @@ function SetRow({
 }) {
   const done = !!set.completedAt;
   const parse = (t: string) => (t.trim() === '' || Number.isNaN(Number(t)) ? null : Number(t));
+  const show = (n: number | null) => (n != null ? String(n) : '');
+  // Controlled text, re-synced when the value changes from outside
+  // (auto-adjusted weights, or a kg/lb switch), without fighting the user's typing.
+  const [weightText, setWeightText] = useState(show(set.weight));
+  const [repsText, setRepsText] = useState(show(set.reps));
+  useEffect(() => {
+    if (parse(weightText) !== set.weight) setWeightText(show(set.weight));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [set.weight]);
+  useEffect(() => {
+    if (parse(repsText) !== set.reps) setRepsText(show(set.reps));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [set.reps]);
   const nextRir = () => onEdit(set.id, 'rir', set.rir == null ? set.targetRir : set.rir >= 4 ? 0 : set.rir + 1);
   return (
     <View style={styles.setRow}>
@@ -309,19 +336,25 @@ function SetRow({
       <TextInput
         style={[styles.input, done && styles.inputDone]}
         keyboardType="decimal-pad"
-        defaultValue={set.weight != null ? String(set.weight) : ''}
+        value={weightText}
         placeholder="—"
         placeholderTextColor={colors.textMuted}
-        onChangeText={(t) => onEdit(set.id, 'weight', parse(t))}
+        onChangeText={(t) => {
+          setWeightText(t);
+          onEdit(set.id, 'weight', parse(t));
+        }}
         selectTextOnFocus
       />
       <TextInput
         style={[styles.input, done && styles.inputDone]}
         keyboardType="number-pad"
-        defaultValue={set.reps != null ? String(set.reps) : ''}
+        value={repsText}
         placeholder="—"
         placeholderTextColor={colors.textMuted}
-        onChangeText={(t) => onEdit(set.id, 'reps', parse(t))}
+        onChangeText={(t) => {
+          setRepsText(t);
+          onEdit(set.id, 'reps', parse(t));
+        }}
         selectTextOnFocus
       />
       <Pressable onPress={nextRir} style={styles.rir} accessibilityLabel="Reps in reserve, tap to change">

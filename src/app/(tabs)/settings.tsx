@@ -50,10 +50,11 @@ export default function SettingsScreen() {
       </View>
       <SectionLabel>Units</SectionLabel>
       <View style={styles.wrap}>
-        <Chip label="lb" selected={settings.units === 'lb'} onPress={() => update({ units: 'lb' })} />
-        <Chip label="kg" selected={settings.units === 'kg'} onPress={() => update({ units: 'kg' })} />
+        <Chip label="Kilograms (kg, km)" selected={settings.units === 'kg'} onPress={() => update({ units: 'kg' })} />
+        <Chip label="Pounds (lb, mi)" selected={settings.units === 'lb'} onPress={() => update({ units: 'lb' })} />
       </View>
-      <Text style={styles.note}>Today's plan updates as soon as you change these.</Text>
+      <Text style={styles.note}>Switching converts all your past weights and distances too.</Text>
+      <Text style={[styles.note, { marginTop: space.md }]}>Today's plan updates as soon as you change these.</Text>
     </ScrollView>
   );
 }
