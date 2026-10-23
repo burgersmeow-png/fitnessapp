@@ -1,58 +1,71 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { EXERCISE_MEDIA } from '../lib/exerciseMedia';
-import { Icon } from './Icon';
+import { useEffect, useMemo, useState } from 'react';
+import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
+import { drawFigure, VIEWBOX } from '../lib/figure';
+import { MOTIONS } from '../lib/motions';
 import { colors, radius, space } from '../lib/theme';
+import type { Exercise } from '../lib/types';
+import { FigureSvg } from './Figure';
+import { Icon } from './Icon';
 
-const HOLD_MS = 1100;
-const FADE_MS = 350;
+const REP_MS = 2800;
 
 /**
- * Loops between the start and end position of an exercise so it reads like a
- * short demo clip. Tap to pause on a position.
+ * A looping, drawn demo of one rep with the working muscles lit up.
+ * Tap to pause. Starts paused when the system's Reduce Motion is on.
  */
-export function ExerciseDemo({ exerciseId }: { exerciseId: string }) {
-  const media = EXERCISE_MEDIA[exerciseId];
-  const fade = useRef(new Animated.Value(0)).current;
-  const [frame, setFrame] = useState(0);
+export function ExerciseDemo({ exercise }: { exercise: Exercise }) {
+  const motion = MOTIONS[exercise.id];
+  const [clock, setClock] = useState(0.55);
   const [playing, setPlaying] = useState(true);
 
   useEffect(() => {
-    if (!media || !playing) return;
-    const timer = setInterval(() => {
-      setFrame((f) => {
-        const next = f === 0 ? 1 : 0;
-        Animated.timing(fade, { toValue: next, duration: FADE_MS, useNativeDriver: true }).start();
-        return next;
-      });
-    }, HOLD_MS + FADE_MS);
-    return () => clearInterval(timer);
-  }, [media, playing, fade]);
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((reduce) => reduce && setPlaying(false))
+      .catch(() => {});
+  }, []);
 
-  if (!media) return null;
-  const [start, end] = media.frames;
+  useEffect(() => {
+    if (!motion || !playing) return;
+    let frame = 0;
+    const startedAt = Date.now() - clock * REP_MS;
+    const tick = () => {
+      setClock(((Date.now() - startedAt) % REP_MS) / REP_MS);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+    // Resume from wherever it was paused.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [motion, playing]);
+
+  const shapes = useMemo(() => (motion ? drawFigure(motion, clock, exercise.primary) : []), [motion, clock, exercise.primary]);
+  if (!motion) return null;
 
   return (
-    <Pressable onPress={() => setPlaying((p) => !p)} style={styles.frame} accessibilityLabel="Exercise demo, tap to pause">
-      <Image source={start} style={styles.image} resizeMode="cover" />
-      {end != null && (
-        <Animated.Image source={end} style={[styles.image, StyleSheet.absoluteFill, { opacity: fade }]} resizeMode="cover" />
-      )}
+    <Pressable
+      onPress={() => setPlaying((p) => !p)}
+      style={styles.frame}
+      accessibilityRole="button"
+      accessibilityLabel={`Animated demo of ${exercise.name}`}
+      accessibilityHint={playing ? 'Tap to pause' : 'Tap to play'}
+    >
+      <FigureSvg shapes={shapes} viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`} width="100%" height="100%" />
       <View style={styles.badge}>
         <Icon name={playing ? 'pause' : 'play'} size={12} color="#FFFFFF" />
-        <Text style={styles.badgeText}>{frame === 0 ? 'Start' : 'Finish'}</Text>
-      </View>
-      <View style={styles.dots}>
-        <View style={[styles.dot, frame === 0 && styles.dotOn]} />
-        <View style={[styles.dot, frame === 1 && styles.dotOn]} />
+        <Text style={styles.badgeText}>{playing ? 'Playing' : 'Paused'}</Text>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  frame: { width: '100%', aspectRatio: 3 / 2, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceRaised },
-  image: { width: '100%', height: '100%' },
+  frame: {
+    width: '100%',
+    aspectRatio: VIEWBOX.width / VIEWBOX.height,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceRaised,
+  },
   badge: {
     position: 'absolute',
     left: space.sm,
@@ -60,13 +73,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   badgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  dots: { position: 'absolute', bottom: space.sm, alignSelf: 'center', flexDirection: 'row', gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.45)' },
-  dotOn: { backgroundColor: '#FFFFFF' },
 });

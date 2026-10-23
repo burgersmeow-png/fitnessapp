@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cardioFatigue } from './cardio';
 import { EXERCISES, EXERCISES_BY_ID } from './exercises';
+import { EXERCISE_GUIDE } from './exerciseGuide';
+import { blend, joints, repProgress } from './figure';
 import { exerciseCount, generateWorkout, muscleRecovery } from './generator';
+import { MOTIONS } from './motions';
 import { adjustNextSet, estimate1RM, liftStatus, personalRecords, suggestNext, suggestWeight, trainingMax } from './progression';
 import { DEFAULT_SETTINGS, type LoggedSet } from './types';
 
@@ -125,4 +128,21 @@ test('a hard run tires the legs and steers the plan to upper body', () => {
   assert.equal(recovery.chest, 1);
   const workout = generateWorkout(EXERCISES, [], DEFAULT_SETTINGS, now, run);
   assert.ok(!workout.focus.includes('quads'));
+});
+
+test('every exercise has a drawn demo and coaching cues', () => {
+  for (const e of EXERCISES) {
+    assert.ok(MOTIONS[e.id], `no demo for ${e.id}`);
+    assert.ok((EXERCISE_GUIDE[e.id] ?? []).length >= 3, `too few cues for ${e.id}`);
+  }
+});
+
+test('the demo figure keeps its anchor joint still through the rep', () => {
+  for (const [id, motion] of Object.entries(MOTIONS)) {
+    for (const t of [0, 0.3, 0.55, 0.8]) {
+      const pose = blend(motion.from, motion.to, repProgress(t));
+      const p = joints(motion, pose)[motion.anchor];
+      assert.ok(Math.abs(p.x - motion.at.x) < 1e-6 && Math.abs(p.y - motion.at.y) < 1e-6, `${id} drifted at ${t}`);
+    }
+  }
 });

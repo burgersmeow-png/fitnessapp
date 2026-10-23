@@ -50,6 +50,7 @@ Code layout:
 
 - `src/app/` screens (Expo Router: each file is a route)
 - `src/lib/generator.ts` workout generator and muscle recovery model
+- `src/lib/figure.ts`, `src/lib/motions.ts` drawn, animated exercise demos (owned, no licence needed)
 - `src/lib/progression.ts` training max, overload, stall and deload logic, mid-workout adjustment, PRs
 - `src/lib/cardio.ts` cardio types and how they load each muscle
 - `src/components/BodyMap.tsx` the front and back body illustration

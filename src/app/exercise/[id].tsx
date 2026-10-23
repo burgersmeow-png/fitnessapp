@@ -6,7 +6,7 @@ import { ExerciseDemo } from '../../components/ExerciseDemo';
 import { Card, SectionLabel, Loading } from '../../components/ui';
 import { loadExercises, loadHistory, loadSettings } from '../../lib/db';
 import { formatDate, MUSCLE_LABELS } from '../../lib/format';
-import { EXERCISE_MEDIA, EXTRA_INSTRUCTIONS } from '../../lib/exerciseMedia';
+import { EXERCISE_GUIDE } from '../../lib/exerciseGuide';
 import { estimate1RM } from '../../lib/progression';
 import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
@@ -32,20 +32,20 @@ export default function ExerciseScreen() {
   const { exercise, sessions, units } = data;
   const best = Math.max(0, ...sessions.map((s) => s.e1rm));
   const recent = sessions.slice(-12);
-  const steps = EXERCISE_MEDIA[exercise.id]?.instructions ?? EXTRA_INSTRUCTIONS[exercise.id] ?? [];
+  const steps = EXERCISE_GUIDE[exercise.id] ?? [];
   const fills: MuscleFills = {};
   for (const m of exercise.secondary) fills[m] = { color: colors.accent, opacity: 0.4 };
   for (const m of exercise.primary) fills[m] = { color: colors.accent };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md }}>
-            <Text style={type.hero}>{exercise.name}</Text>
+      <Text style={type.hero}>{exercise.name}</Text>
       <Text style={[type.body, { color: colors.textMuted, marginTop: space.xs, textTransform: 'capitalize' }]}>
         {[...exercise.primary, ...exercise.secondary].map((m) => MUSCLE_LABELS[m]).join(', ')} · {exercise.equipment}
       </Text>
 
       <View style={{ marginTop: space.md }}>
-        <ExerciseDemo exerciseId={exercise.id} />
+        <ExerciseDemo exercise={exercise} />
       </View>
 
       {steps.length > 0 && <SectionLabel>How to do it</SectionLabel>}
