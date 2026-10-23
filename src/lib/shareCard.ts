@@ -27,6 +27,8 @@ export interface CardContent {
   code?: string;
   /** Before-and-after photos (data URIs), drawn side by side in place of the lines. */
   photos?: { before: CardPhoto; after: CardPhoto };
+  /** A training calendar, week columns of Monday..Sunday: -1 future, 0 rest, 1 cardio, 2 lifted. */
+  grid?: number[][];
 }
 
 export interface CardPhoto {
