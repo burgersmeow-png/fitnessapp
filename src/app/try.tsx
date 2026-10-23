@@ -8,18 +8,20 @@ import { activeWorkoutId, loadExercises, loadHistory, loadSettings, startWorkout
 import { formatNumber } from '../lib/format';
 import { colors, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
-import { decodeWorkoutLink, planFromLink } from '../lib/workoutLink';
+import { isSaved } from '../lib/savedWorkouts';
+import { decodeWorkoutLink, encodeWorkoutLink, planFromLink } from '../lib/workoutLink';
+import { forgetWorkout, keepWorkout, loadSaved } from '../services/savedWorkouts';
 
 /** Opened from a shared workout link (liftlab://try?w=…). */
 export default function TryWorkoutScreen() {
   const { w } = useLocalSearchParams<{ w?: string }>();
   const db = useSQLiteContext();
-  const [data] = useFocusData(async () => {
+  const [data, reload] = useFocusData(async () => {
     const link = decodeWorkoutLink(w);
     if (!link) return { link: null } as const;
-    const [exercises, history, settings, activeId] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), activeWorkoutId(db)]);
+    const [exercises, history, settings, activeId, saved] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), activeWorkoutId(db), loadSaved(db)]);
     const { plan, missing } = planFromLink(link, exercises, history, settings.units === 'kg' ? 2.5 : 5);
-    return { link, plan, missing, exercises: new Map(exercises.map((e) => [e.id, e])), units: settings.units, activeId };
+    return { link, plan, missing, exercises: new Map(exercises.map((e) => [e.id, e])), units: settings.units, activeId, saved: isSaved(saved, link) };
   }, [w]);
   if (!data) return <Loading />;
 
@@ -33,7 +35,13 @@ export default function TryWorkoutScreen() {
       </View>
     );
   }
-  const { link, plan, missing, exercises, units, activeId } = data;
+  const { link, plan, missing, exercises, units, activeId, saved } = data;
+
+  const toggleSaved = async () => {
+    if (saved) await forgetWorkout(db, encodeWorkoutLink(link));
+    else await keepWorkout(db, link);
+    reload();
+  };
 
   const start = async () => {
     await startWorkout(db, plan);
@@ -52,9 +60,15 @@ export default function TryWorkoutScreen() {
         <Button
           title={activeId == null ? 'Start this workout' : 'Back to your current workout'}
           onPress={activeId == null ? start : () => router.replace('/workout')}
-          style={{ marginVertical: space.md }}
+          style={{ marginTop: space.md }}
         />
       )}
+      <Button
+        title={saved ? 'Saved ✓ · tap to remove' : 'Save for later'}
+        variant="secondary"
+        onPress={toggleSaved}
+        style={{ marginTop: space.sm, marginBottom: space.md }}
+      />
       {activeId != null && <Text style={[styles.sub, { marginTop: 0, marginBottom: space.md }]}>Finish your current workout first, then open the link again.</Text>}
 
       {plan.map((p, i) => {

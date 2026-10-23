@@ -53,6 +53,7 @@ const ICONS = {
   medal: { sf: 'medal.fill', ion: 'medal' },
   bell: { sf: 'bell.fill', ion: 'notifications' },
   lock: { sf: 'lock.fill', ion: 'lock-closed' },
+  bookmark: { sf: 'bookmark.fill', ion: 'bookmark' },
 } as const satisfies Record<string, { sf: SFSymbol; ion: keyof typeof Ionicons.glyphMap }>;
 
 export type IconName = keyof typeof ICONS;

@@ -24,6 +24,7 @@ import { ALL_MUSCLES, type Exercise, type Settings } from '../../lib/types';
 import { useFocusData } from '../../lib/useData';
 import { checkBadges, loadSessionDates } from '../../services/habits';
 import { loadProgram, rememberProgramWorkout } from '../../services/programs';
+import { loadSaved } from '../../services/savedWorkouts';
 import { syncReminders } from '../../services/reminders';
 import { syncStravaIfDue } from '../../services/strava';
 
@@ -39,6 +40,7 @@ interface TodayData {
   lastCardio: CardioSession | null;
   eaten: Macros;
   targets: Macros;
+  savedCount: number;
 }
 
 const GOAL_LABEL = { strength: 'Strength', hypertrophy: 'Muscle', endurance: 'Endurance' };
@@ -49,7 +51,7 @@ export default function TodayScreen() {
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
   const [data, reload] = useFocusData<TodayData>(async () => {
-    const [exercises, history, settings, activeId, cardio, food, sessionDates, program] = await Promise.all([
+    const [exercises, history, settings, activeId, cardio, food, sessionDates, program, saved] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadSettings(db),
@@ -58,6 +60,7 @@ export default function TodayScreen() {
       loadFoodForDay(db, new Date()),
       loadSessionDates(db),
       loadProgram(db),
+      loadSaved(db),
     ]);
     const badges = await checkBadges(db, settings.weeklyGoal);
     // Re-plan reminders whenever Today opens, so they reflect what's been done.
@@ -80,6 +83,7 @@ export default function TodayScreen() {
       lastCardio: cardio[0] ?? null,
       eaten: sumMacros(food),
       targets: dailyTargets(settings.bodyWeightKg, settings.nutritionGoal, settings.goal),
+      savedCount: saved.length,
     };
   }, [seed]);
 
@@ -225,6 +229,25 @@ export default function TodayScreen() {
         </View>
         <Icon name="chevron" size={20} color={colors.textMuted} />
       </Pressable>
+
+      {data.savedCount > 0 && (
+        <Pressable
+          onPress={() => router.push('/saved')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.cardioCard, { marginBottom: space.sm }, pressed && { opacity: 0.8 }]}
+        >
+          <View style={styles.cardioIcon}>
+            <Icon name="bookmark" size={22} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1, marginLeft: space.md }}>
+            <Text style={styles.rowTitle}>Saved workouts</Text>
+            <Text style={styles.rowMeta}>
+              {data.savedCount} from shared links
+            </Text>
+          </View>
+          <Icon name="chevron" size={20} color={colors.textMuted} />
+        </Pressable>
+      )}
 
       <Pressable
         onPress={() => router.push('/food')}
