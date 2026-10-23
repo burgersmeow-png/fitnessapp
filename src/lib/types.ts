@@ -55,6 +55,9 @@ export interface Settings {
   reminderDays: number[];
   /** Minutes after midnight. */
   reminderMinutes: number;
+  /** First-run setup is done (or skipped). */
+  onboarded: boolean;
+  experience: 'new' | 'some' | 'experienced';
 }
 
 export interface PlannedExercise {
@@ -104,4 +107,6 @@ export const DEFAULT_SETTINGS: Settings = {
   weeklyGoal: 3,
   reminderDays: [],
   reminderMinutes: 17 * 60 + 30,
+  onboarded: false,
+  experience: 'some',
 };

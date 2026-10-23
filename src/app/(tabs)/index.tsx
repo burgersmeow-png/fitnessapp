@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -15,6 +15,7 @@ import { activeWorkoutId, loadCardio, loadExercises, loadFoodForDay, loadHistory
 import { dailyTargets, sumMacros, type Macros } from '../../lib/nutrition';
 import { formatNumber, MUSCLE_LABELS } from '../../lib/format';
 import { generateWorkout, type GeneratedWorkout } from '../../lib/generator';
+import { needsOnboarding } from '../../lib/onboarding';
 import { deloadWorkout, programStep, type ProgramStep } from '../../lib/programs';
 import { weekProgress, type Badge, type WeekProgress } from '../../lib/habits';
 import { colors, radius, space, TAP, type } from '../../lib/theme';
@@ -33,6 +34,7 @@ interface TodayData {
   week: WeekProgress;
   freshBadges: Badge[];
   step: ProgramStep | null;
+  onboard: boolean;
   lastCardio: CardioSession | null;
   eaten: Macros;
   targets: Macros;
@@ -68,6 +70,7 @@ export default function TodayScreen() {
     return {
       workout: following?.deload ? deloadWorkout(planned, settings.units === 'kg' ? 2.5 : 5) : planned,
       step,
+      onboard: needsOnboarding(settings, sessionDates.length > 0),
       exercises: new Map(exercises.map((e) => [e.id, e])),
       settings,
       activeId,
@@ -85,6 +88,7 @@ export default function TodayScreen() {
   }, [db, reload]);
 
   if (!data) return <Loading />;
+  if (data.onboard) return <Redirect href="/welcome" />;
   const { workout, exercises, settings, activeId, lastCardio } = data;
   const totalSets = workout.exercises.reduce((n, p) => n + p.sets, 0);
   const following = data.step && !data.step.finished ? data.step : null;
