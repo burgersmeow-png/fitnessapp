@@ -2,13 +2,15 @@
 // it active after their first workout. No sign-in needed, since most people never make an account.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readJson, send } from './http';
-import { dailyCounts, parseClaim, parsePinsRequest, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
+import { dailyCounts, dailyOpens, parseClaim, parsePinsRequest, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
 import { admin, databaseConfigured } from './supabase';
 import type { Pin } from './referralRules';
 
 export const referralsConfigured = databaseConfigured;
 
 const allow = rateLimiter(20, 60_000);
+// One counted open per visitor per code every 30 minutes, so refreshing doesn't inflate it.
+const freshOpen = rateLimiter(1, 30 * 60_000);
 const ipOf = (req: IncomingMessage) => (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim() ?? req.socket.remoteAddress ?? '?';
 
 async function lookup(code: string) {
@@ -28,6 +30,16 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       const found = validCode(code) ? await lookup(code!) : null;
       if (!found) return send(res, 404, { error: 'That code isn’t valid. Check the spelling with your creator.' }), true;
       return send(res, 200, { code: found.code, creatorName: found.creator_name, welcome: found.welcome, pins: found.pins ?? [] }), true;
+    }
+    if (req.method === 'POST' && url.pathname === '/ref/open') {
+      // The landing page was opened with this code. Sent with sendBeacon, so the body is plain text.
+      const { code } = ((await readJson(req, 128)) ?? {}) as { code?: unknown };
+      if (typeof code !== 'string' || !validCode(code)) return send(res, 400, { error: 'Bad request' }), true;
+      if (freshOpen(`${ipOf(req)}|${code}`) && (await lookup(code))) {
+        const { error } = await admin().rpc('count_link_open', { p_code: code });
+        if (error) throw error;
+      }
+      return send(res, 200, { ok: true }), true;
     }
     if (req.method === 'POST' && url.pathname === '/ref/claim') {
       const claim = parseClaim(await readJson(req, 512));
@@ -54,13 +66,15 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
       if (!ask) return denied(), true;
       const { data: c } = await admin().from('creator_codes').select('code, creator_name, stats_token, pins').eq('code', ask.code).maybeSingle();
       if (!c || !tokensMatch(c.stats_token, ask.token)) return denied(), true;
-      const [{ data: stats }, { data: recent }] = await Promise.all([
+      const since = new Date(Date.now() - 14 * 864e5).toISOString();
+      const [{ data: stats }, { data: recent }, { data: opens }] = await Promise.all([
         admin().from('creator_stats').select('signups, active_users, signups_last_7_days').eq('code', ask.code).single(),
         admin()
           .from('referrals')
           .select('created_at')
           .eq('code', ask.code)
-          .gte('created_at', new Date(Date.now() - 14 * 864e5).toISOString()),
+          .gte('created_at', since),
+        admin().from('creator_link_opens').select('day, opens').eq('code', ask.code).gte('day', since.slice(0, 10)),
       ]);
       return send(res, 200, {
         code: c.code,
@@ -69,6 +83,7 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
         activeUsers: stats?.active_users ?? 0,
         signupsLast7Days: stats?.signups_last_7_days ?? 0,
         pins: c.pins ?? [],
+        dailyOpens: dailyOpens((opens ?? []) as { day: string; opens: number }[], new Date()),
         daily: dailyCounts((recent ?? []).map((r: { created_at: string }) => r.created_at), new Date()),
       }), true;
     }

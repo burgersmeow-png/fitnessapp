@@ -231,6 +231,8 @@ The page needs `serverUrl` set in `site/config.js`. To cut off a link, give that
 
 Creators can also pin up to 6 workout, plan or challenge links on the dashboard (after the
 `creator_pins` migration). Followers who open the creator's link (`?code=ALEX10`) see them listed.
+After the `creator_link_opens` migration, the dashboard also counts how often each link is opened
+(once per visitor every 30 minutes).
 
 ## Strava (switched off for now)
 

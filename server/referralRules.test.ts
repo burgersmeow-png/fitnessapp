@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dailyCounts, parseClaim, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
+import { dailyCounts, dailyOpens, parseClaim, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
 
 test('claims need a real code and install id', () => {
   const installId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -66,4 +66,13 @@ test('a save request needs the dashboard secret and at most 6 good links', () =>
   assert.equal(parsePinsRequest({ ...auth, links: Array(7).fill(`?w=${workout}`) }), null);
   assert.equal(parsePinsRequest({ code: 'ALEX10', token: 'nope', links: [] }), null);
   assert.deepEqual(parsePinsRequest({ ...auth, links: [] })?.pins, []);
+});
+
+test('link opens are summed per day, old days dropped', () => {
+  const now = new Date('2026-10-23T12:00:00Z');
+  const d = dailyOpens([{ day: '2026-10-23', opens: 40 }, { day: '2026-10-20', opens: 7 }, { day: '2026-09-01', opens: 99 }], now);
+  assert.equal(d.length, 14);
+  assert.equal(d[13].count, 40);
+  assert.equal(d[10].count, 7);
+  assert.equal(d.reduce((n, x) => n + x.count, 0), 47);
 });
