@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { liftTrends, trainingDaysPerWeek, trend, trendChange, weightNote } from './progress';
+import { EXERCISES } from './exercises';
+import { liftTrends, setsPerMuscle, trainingDaysPerWeek, trend, trendChange, weightNote } from './progress';
+import type { LoggedSet } from './types';
 
 const now = new Date(2026, 9, 23, 12).getTime(); // Friday
 const day = (n: number) => now - n * 864e5;
@@ -46,4 +48,19 @@ test('training days per week, this week last', () => {
   );
   assert.deepEqual(weeks.map((w) => w.days), [0, 0, 1, 2]);
   assert.equal(weeks[3].weekStart.getDay(), 1);
+});
+
+test('weekly sets count fully for main muscles and half for helpers', () => {
+  const byId = new Map(EXERCISES.map((e) => [e.id, e]));
+  const at = (daysAgo: number) => new Date(now - daysAgo * 864e5).toISOString();
+  const h: LoggedSet[] = [
+    ...[1, 1, 1].map(() => ({ exerciseId: 'bb-bench', weight: 100, reps: 8, rir: 2, completedAt: at(1) })),
+    { exerciseId: 'bb-bench', weight: 100, reps: 8, rir: 2, completedAt: at(9) },
+    { exerciseId: 'bb-bench', weight: 100, reps: 0, rir: null, completedAt: at(1) },
+  ];
+  const sets = new Map(setsPerMuscle(h, byId, now).map((x) => [x.muscle, x.sets]));
+  assert.equal(sets.get('chest'), 3);
+  assert.equal(sets.get('triceps'), 1.5);
+  assert.equal(sets.get('quads'), 0);
+  assert.equal(setsPerMuscle(h, byId, now)[0].muscle, 'chest');
 });

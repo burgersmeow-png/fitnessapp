@@ -3,7 +3,7 @@
 import { dayKey } from './habits';
 import { estimate1RM } from './progression';
 import { startOfWeek } from './social';
-import type { LoggedSet } from './types';
+import { ALL_MUSCLES, type Exercise, type LoggedSet, type Muscle } from './types';
 
 export interface Point {
   /** Milliseconds since 1970. */
@@ -102,4 +102,29 @@ export function trainingDaysPerWeek(dates: string[], now = new Date(), weeks = 1
     out.find((x) => x.weekStart.getTime() === w)?.days.add(dayKey(d));
   }
   return out.map((x) => ({ weekStart: x.weekStart, days: x.days.size }));
+}
+
+/** Weekly hard sets per muscle that suit most people building muscle. */
+export const WEEKLY_SETS = { low: 10, high: 20 };
+
+/**
+ * Sets per muscle over the last `days`: a set counts fully for the muscles a lift mainly
+ * works and half for the ones it helps. Every muscle is listed, most-trained first.
+ */
+export function setsPerMuscle(
+  history: LoggedSet[],
+  exercises: Map<string, Exercise>,
+  now = Date.now(),
+  days = 7,
+): { muscle: Muscle; sets: number }[] {
+  const since = now - days * DAY;
+  const count = new Map<Muscle, number>(ALL_MUSCLES.map((m) => [m, 0]));
+  for (const s of history) {
+    if (s.reps <= 0 || Date.parse(s.completedAt) < since) continue;
+    const e = exercises.get(s.exerciseId);
+    if (!e) continue;
+    for (const m of e.primary) count.set(m, count.get(m)! + 1);
+    for (const m of e.secondary) count.set(m, count.get(m)! + 0.5);
+  }
+  return ALL_MUSCLES.map((m) => ({ muscle: m, sets: count.get(m)! })).sort((a, b) => b.sets - a.sets);
 }

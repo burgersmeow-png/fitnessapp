@@ -6,8 +6,8 @@ import { Icon } from '../components/Icon';
 import { LineChart } from '../components/LineChart';
 import { Button, Card, Loading, SectionLabel } from '../components/ui';
 import { deleteBodyWeight, loadBodyWeights, loadExercises, loadHistory, loadSettings, logBodyWeight } from '../lib/db';
-import { formatNumber } from '../lib/format';
-import { liftTrends, trainingDaysPerWeek, trend, trendChange, weightNote } from '../lib/progress';
+import { formatNumber, MUSCLE_LABELS } from '../lib/format';
+import { liftTrends, setsPerMuscle, trainingDaysPerWeek, trend, trendChange, WEEKLY_SETS, weightNote } from '../lib/progress';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { loadSessionDates } from '../services/habits';
@@ -31,10 +31,13 @@ export default function ProgressScreen() {
       names: new Map(exercises.map((e) => [e.id, e.name])),
       lifts: liftTrends(history),
       weeks: trainingDaysPerWeek(dates),
+      muscles: setsPerMuscle(history, new Map(exercises.map((e) => [e.id, e]))),
     };
   });
   if (!data) return <Loading />;
-  const { weights, settings, lifts, weeks, names } = data;
+  const { weights, settings, lifts, weeks, names, muscles } = data;
+  // Scale so the top of the target band and the busiest muscle both fit.
+  const muscleMax = Math.max(WEEKLY_SETS.high + 4, ...muscles.map((m) => m.sets));
   const unit = settings.units;
   const points = weights.map((w) => ({ t: Date.parse(w.measuredAt), v: w.weight }));
   const smooth = trend(points);
@@ -135,6 +138,38 @@ export default function ProgressScreen() {
         <Text style={[styles.small, { marginTop: space.sm }]}>Orange weeks hit your goal. Tap a week to see it.</Text>
       </Card>
 
+      <SectionLabel>Sets per muscle, last 7 days</SectionLabel>
+      <Card>
+        {muscles.map(({ muscle, sets }) => {
+          const inRange = sets >= WEEKLY_SETS.low;
+          return (
+            <View key={muscle} style={styles.muscleRow} accessible accessibilityLabel={`${MUSCLE_LABELS[muscle]}: ${sets} sets`}>
+              <Text style={styles.muscleName}>{MUSCLE_LABELS[muscle]}</Text>
+              <View style={styles.track}>
+                <View
+                  style={[
+                    styles.band,
+                    { left: `${(WEEKLY_SETS.low / muscleMax) * 100}%`, width: `${((WEEKLY_SETS.high - WEEKLY_SETS.low) / muscleMax) * 100}%` },
+                  ]}
+                />
+                {sets > 0 && (
+                  <View
+                    style={[
+                      styles.fill,
+                      { width: `${(sets / muscleMax) * 100}%`, backgroundColor: inRange ? colors.accent : colors.textMuted, opacity: inRange ? 1 : 0.6 },
+                    ]}
+                  />
+                )}
+              </View>
+              <Text style={styles.muscleSets}>{Number.isInteger(sets) ? sets : sets.toFixed(1)}</Text>
+            </View>
+          );
+        })}
+        <Text style={[styles.small, { marginTop: space.sm }]}>
+          The shaded zone is {WEEKLY_SETS.low}–{WEEKLY_SETS.high} sets a week, where most people grow best. Lifts count half for muscles they only help.
+        </Text>
+      </Card>
+
       <SectionLabel>Strength (estimated 1-rep max)</SectionLabel>
       {lifts.length === 0 && (
         <Card>
@@ -195,6 +230,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   unit: { color: colors.textMuted, fontSize: 17, fontWeight: '600' },
+  muscleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 28 },
+  muscleName: { width: 92, color: colors.text, fontSize: 14 },
+  track: { flex: 1, height: 12, borderRadius: 6, backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
+  band: { position: 'absolute', top: 0, bottom: 0, backgroundColor: colors.border },
+  fill: { height: '100%', borderRadius: 6 },
+  muscleSets: { width: 36, textAlign: 'right', color: colors.text, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
   bars: { flexDirection: 'row', alignItems: 'flex-end', height: 110, marginTop: space.md, gap: 2 },
   barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end' },
   bar: { width: '100%', borderTopLeftRadius: 4, borderTopRightRadius: 4 },
