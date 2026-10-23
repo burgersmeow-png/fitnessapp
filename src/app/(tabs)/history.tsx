@@ -1,12 +1,17 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '../../components/Icon';
+import { ShareCardSheet } from '../../components/ShareCardSheet';
 import { Card, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, EFFORTS, type CardioSession } from '../../lib/cardio';
-import { loadCardio, loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
+import { loadCardio, loadExercises, loadHistory, loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
 import { BADGES, weekProgress } from '../../lib/habits';
+import { recapContent, recapMonth } from '../../lib/recap';
+import { prHistory } from '../../lib/records';
+import type { CardContent } from '../../lib/shareCard';
 import { colors, radius, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
 import { checkBadges } from '../../services/habits';
@@ -15,6 +20,7 @@ type Entry = { kind: 'lift'; at: string; workout: WorkoutSummary } | { kind: 'ca
 
 export default function HistoryScreen() {
   const db = useSQLiteContext();
+  const [card, setCard] = useState<CardContent | null>(null);
   const [data] = useFocusData(async () => {
     const settings = await loadSettings(db);
     const [workouts, cardio, badges] = await Promise.all([loadWorkouts(db), loadCardio(db), checkBadges(db, settings.weeklyGoal)]);
@@ -27,8 +33,19 @@ export default function HistoryScreen() {
     ...cardio.map((c) => ({ kind: 'cardio' as const, at: c.startedAt, cardio: c })),
   ].sort((a, b) => b.at.localeCompare(a.at));
   const streak = weekProgress(entries.map((e) => e.at), settings.weeklyGoal).streak;
+  const month = recapMonth(new Date(), entries.map((e) => e.at));
+  const monthName = month.toLocaleDateString(undefined, { month: 'long' });
+  const trainedThisMonth = entries.some((e) => new Date(e.at).getMonth() === month.getMonth() && new Date(e.at).getFullYear() === month.getFullYear());
+
+  // Sets and exercises are only needed for the card, so they load on tap.
+  const shareMonth = async () => {
+    const [history, exercises] = await Promise.all([loadHistory(db), loadExercises(db)]);
+    const names = new Map(exercises.map((e) => [e.id, e.name]));
+    setCard(recapContent({ month, workouts, cardio, history, prs: prHistory(history, 1000), name: (id) => names.get(id) ?? id, units: settings.units }));
+  };
 
   return (
+    <>
     <FlatList
       style={styles.screen}
       contentContainerStyle={{ padding: space.md, gap: space.md }}
@@ -81,6 +98,14 @@ export default function HistoryScreen() {
           <Text style={styles.meta}>Best sets, recent PRs</Text>
           <Icon name="chevron" size={14} color={colors.textMuted} />
         </Pressable>
+        {trainedThisMonth && (
+          <Pressable onPress={shareMonth} accessibilityRole="button" style={({ pressed }) => [styles.progressRow, pressed && { opacity: 0.8 }]}>
+            <Icon name="share" size={20} color={colors.accent} />
+            <Text style={[type.body, { flex: 1, fontWeight: '700' }]}>Share your {monthName}</Text>
+            <Text style={styles.meta}>Story-sized recap</Text>
+            <Icon name="chevron" size={14} color={colors.textMuted} />
+          </Pressable>
+        )}
         </View>
       }
       ListEmptyComponent={
@@ -144,6 +169,8 @@ export default function HistoryScreen() {
         );
       }}
     />
+    <ShareCardSheet content={card} onClose={() => setCard(null)} title={`Share your ${monthName}`} fileName="liftlab-month.png" />
+    </>
   );
 }
 
