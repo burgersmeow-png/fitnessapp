@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { confirm } from '../../components/confirm';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
@@ -17,12 +18,16 @@ import {
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
 import { estimate1RM } from '../../lib/progression';
 import { groupSets, repeatPlan } from '../../lib/repeat';
+import { prHistory } from '../../lib/records';
+import { cardContent, type CardContent } from '../../lib/shareCard';
+import { ShareCardSheet } from '../../components/ShareCardSheet';
 import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
+  const [card, setCard] = useState<CardContent | null>(null);
   const [data] = useFocusData(async () => {
     const workoutId = Number(id);
     const [workout, sets, exercises, settings, history, activeId] = await Promise.all([
@@ -55,6 +60,19 @@ export default function SessionScreen() {
     router.replace('/workout');
   };
 
+  const share = () => {
+    const ids = new Set(sets.map((s) => s.completedAt));
+    const prs = prHistory(history, 1000)
+      .filter((p) => ids.has(p.at))
+      .map((p) => exercises.get(p.exerciseId)?.name ?? p.exerciseId);
+    const lifts = groupSets(sets).map((g) => {
+      const best = [...g.sets].sort((a, b) => estimate1RM(b.weight ?? 0, b.reps ?? 0, b.rir) - estimate1RM(a.weight ?? 0, a.reps ?? 0, a.rir))[0];
+      return { name: exercises.get(g.exerciseId)?.name ?? g.exerciseId, sets: g.sets.length, best: { weight: best.weight, reps: best.reps } };
+    });
+    const minutes = workout.finishedAt ? Math.max(1, Math.round((Date.parse(workout.finishedAt) - Date.parse(workout.startedAt)) / 6e4)) : 0;
+    setCard(cardContent({ startedAt: workout.startedAt, minutes, sets: sets.length, volume, units, prs: [...new Set(prs)], exercises: lifts }));
+  };
+
   const remove = () =>
     confirm('Delete this workout?', 'Its sets come out of your history, charts and PRs. This can’t be undone.', 'Delete', async () => {
       await deleteWorkout(db, workout.id);
@@ -79,6 +97,7 @@ export default function SessionScreen() {
           ? 'Same lifts, sets and reps, with today’s weights from your progress.'
           : 'You have a workout going. Finish it, then you can do this one again.'}
       </Text>
+      <Button title="Share to your story" variant="secondary" onPress={share} style={{ marginBottom: space.md }} />
 
       {groupSets(sets).map((g, gi) => {
         const e = exercises.get(g.exerciseId);
@@ -105,6 +124,7 @@ export default function SessionScreen() {
         );
       })}
 
+      <ShareCardSheet content={card} onClose={() => setCard(null)} />
       <Button title="Delete workout" variant="danger" onPress={remove} style={{ marginTop: space.md }} />
     </ScrollView>
   );

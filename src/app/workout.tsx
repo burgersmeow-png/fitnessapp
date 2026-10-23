@@ -35,6 +35,8 @@ import { say } from '../services/speech';
 import { EXAMPLES, parseCommand } from '../lib/voice';
 import { CoachBar } from '../components/CoachBar';
 import { StravaShare } from '../components/StravaShare';
+import { ShareCardSheet } from '../components/ShareCardSheet';
+import { cardContent, type CardContent } from '../lib/shareCard';
 import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
 import { finishAssignedWorkout } from '../services/coaching';
@@ -93,6 +95,7 @@ export default function WorkoutScreen() {
   const [notes, setNotes] = useState<LiftNotes>({});
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [restTimes, setRestTimes] = useState<RestTimes>({});
+  const [card, setCard] = useState<CardContent | null>(null);
   // The exercise group being swapped, by its first set's id.
   const [swapping, setSwapping] = useState<number | null>(null);
 
@@ -469,7 +472,16 @@ export default function WorkoutScreen() {
         {summary.badges.length > 2 && (
           <Text style={[styles.goalMeta, { marginTop: space.sm }]}>{`+${summary.badges.length - 2} more in Badges`}</Text>
         )}
+        <Button
+          title="Share to your story"
+          variant="secondary"
+          onPress={() =>
+            setCard(cardContent({ ...summary.strava, sets: summary.sets, volume: summary.volume, streak: summary.week.streak }))
+          }
+          style={{ marginTop: space.lg }}
+        />
         <StravaShare workout={summary.strava} />
+        <ShareCardSheet content={card} onClose={() => setCard(null)} />
         <Button title="Done" onPress={() => close()} style={{ marginTop: 'auto', marginBottom: insets.bottom + space.md }} />
       </View>
     );
