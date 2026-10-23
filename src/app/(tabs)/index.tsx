@@ -12,7 +12,7 @@ import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { GoalCard } from '../../components/GoalCard';
 import { ProgressRing } from '../../components/ProgressRing';
 import { Icon, type IconName } from '../../components/Icon';
-import { SectionLabel, Loading } from '../../components/ui';
+import { Chip, SectionLabel, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, cardioFatigue, type CardioSession } from '../../lib/cardio';
 import { flushCreator } from '../../services/creatorCode';
 import { activeWorkoutId, loadCardio, loadExercises, loadFoodForDay, loadHistory, loadSettings, startWorkout } from '../../lib/db';
@@ -34,6 +34,8 @@ import { planFromLink } from '../../lib/workoutLink';
 import { loadChallenge } from '../../services/challenge';
 import { challengeProgress, type ChallengeProgress, type JoinedChallenge } from '../../lib/challenge';
 import { syncRecapNudge, syncReminders } from '../../services/reminders';
+import { loadGyms, saveGyms } from '../../services/gyms';
+import { switchGym, type Gyms } from '../../lib/gyms';
 import { syncStravaIfDue } from '../../services/strava';
 
 interface TodayData {
@@ -51,6 +53,7 @@ interface TodayData {
   savedCount: number;
   plan: { followed: FollowedPlan; next: PlannedExercise[] } | null;
   challenge: { def: JoinedChallenge; progress: ChallengeProgress } | null;
+  gyms: Gyms;
 }
 
 const GOAL_LABEL = { strength: 'Strength', hypertrophy: 'Muscle', endurance: 'Endurance' };
@@ -74,7 +77,7 @@ export default function TodayScreen() {
       loadChallenge(db),
       loadPlan(db),
     ]);
-    const badges = await checkBadges(db, settings.weeklyGoal);
+    const [badges, gyms] = await Promise.all([checkBadges(db, settings.weeklyGoal), loadGyms(db)]);
     // Re-plan reminders whenever Today opens, so they reflect what's been done.
     syncReminders(db, settings);
     syncRecapNudge(db);
@@ -101,6 +104,7 @@ export default function TodayScreen() {
         ? { followed: plan, next: planFromLink(plan.days[plan.next], exercises, history, settings.units === 'kg' ? 2.5 : 5).plan }
         : null,
       challenge: challenge ? { def: challenge, progress: challengeProgress(challenge, sessionDates, new Date()) } : null,
+      gyms,
     };
   }, [seed]);
 
@@ -167,6 +171,24 @@ export default function TodayScreen() {
 
       <CoachPlanCard activeId={activeId} />
       <CreatorFeedCard />
+
+      {data.gyms.list.length > 1 && activeId == null && (
+        <View style={styles.gymRow}>
+          <Text style={styles.gymLabel}>TRAINING AT</Text>
+          {data.gyms.list.map((g) => (
+            <Chip
+              key={g.id}
+              label={g.name}
+              selected={g.id === data.gyms.active}
+              onPress={async () => {
+                if (g.id === data.gyms.active) return;
+                await saveGyms(db, switchGym(data.gyms, g.id));
+                reload();
+              }}
+            />
+          ))}
+        </View>
+      )}
 
       <LinearGradient colors={['#FF6A2B', '#E5341B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={{ flexDirection: 'row' }}>
@@ -417,6 +439,8 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  gymRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: space.sm },
+  gymLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0.6, marginRight: space.sm, marginBottom: space.sm },
   planCard: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, padding: space.md, marginBottom: space.md, gap: space.md },
   planEyebrow: { ...type.label, color: colors.accent },
   planTitle: { color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 4 },
