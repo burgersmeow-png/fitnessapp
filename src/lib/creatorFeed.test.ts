@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cleanPins, feedStale, starterLabel, starterPin, isNew, markSeen, mergeFeed, pinRoute, type Pin } from './creatorFeed';
+import { cleanPins, crewCardContent, feedStale, starterLabel, starterPin, isNew, markSeen, mergeFeed, pinRoute, type Pin } from './creatorFeed';
 
 const w: Pin = { kind: 'w', payload: 'WzEsIkxlZyBkYXki', title: 'Leg day' };
 const p: Pin = { kind: 'p', payload: 'WzEsIlNwbGl0Il0x', title: 'Split' };
@@ -45,4 +45,20 @@ test('new followers start with the plan, then a workout, then a challenge', () =
   assert.equal(starterPin([]), null);
   assert.equal(starterLabel('Alex', p), 'Follow Alex’s Split');
   assert.equal(starterLabel('Alex', c), 'Join Alex’s 12 in 4 weeks');
+});
+
+test('the crew card leads with my place', () => {
+  const top = [
+    { place: 1, nickname: 'Jordan', days: 4, me: false },
+    { place: 2, nickname: 'Sam', days: 3, me: true },
+  ];
+  const c = crewCardContent('Alex', top[1], top, 12);
+  assert.equal(c.eyebrow, 'ALEX’S CREW · THIS WEEK');
+  assert.equal(c.headline, '#2 IN THE CREW');
+  assert.deepEqual(c.stats.map((s) => s.value), ['#2', '3', '12']);
+  assert.deepEqual(c.lines[1], { name: '2. Sam (me)', detail: '3 days', pr: true });
+  assert.equal(crewCardContent('Alex', { ...top[0], me: true }, top, 12).headline, 'TOP OF THE CREW');
+  const crowd = [top[0], { place: 2, nickname: 'Mo', days: 3, me: false }, { place: 2, nickname: 'Kat', days: 3, me: false }];
+  const late = { place: 2, nickname: 'Sam', days: 3, me: true };
+  assert.deepEqual(crewCardContent('Alex', late, [...crowd, late], 12).lines.map((l) => l.name), ['1. Jordan', '2. Mo', '2. Sam (me)']);
 });

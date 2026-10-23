@@ -6,6 +6,9 @@ import { useFocusData } from '../lib/useData';
 import { creatorCodesAvailable, loadCreator } from '../services/creatorCode';
 import { joinCrew, leaveCrew, loadCrewBoard, loadCrewName, type CrewPlace } from '../services/crew';
 import { confirm } from './confirm';
+import { ShareCardSheet } from './ShareCardSheet';
+import { crewCardContent } from '../lib/creatorFeed';
+import type { CardContent } from '../lib/shareCard';
 import { Icon } from './Icon';
 import { Button } from './ui';
 
@@ -24,6 +27,7 @@ export function CrewCard() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [card, setCard] = useState<CardContent | null>(null);
   if (!data) return null;
   const who = data.board?.creatorName ?? data.creator.creatorName;
 
@@ -102,6 +106,18 @@ export function CrewCard() {
           <Text style={styles.days}>{daysText(p.days)}</Text>
         </View>
       ))}
+      {board?.me && board.me.days > 0 && (
+        <Pressable
+          onPress={() => setCard(crewCardContent(who, board.me!, board.top, board.total))}
+          accessibilityRole="button"
+          hitSlop={8}
+          style={styles.share}
+        >
+          <Icon name="share" size={18} color={colors.accent} />
+          <Text style={styles.shareText}>Share your place</Text>
+        </Pressable>
+      )}
+      <ShareCardSheet content={card} onClose={() => setCard(null)} title="Share your place" fileName="liftlab-crew.png" />
       {board && board.total > rows.filter((p) => p.days > 0).length && (
         <Text style={[styles.meta, { marginTop: space.xs }]}>{board.total} training this week</Text>
       )}
@@ -117,6 +133,8 @@ const styles = StyleSheet.create({
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { ...type.label, color: colors.accent, flex: 1 },
+  share: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm, minHeight: 44 },
+  shareText: { color: colors.accent, fontSize: 15, fontWeight: '700' },
   leave: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
   input: { minHeight: 48, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised, color: colors.text, paddingHorizontal: space.md, fontSize: 17, marginTop: space.md },
   error: { color: colors.warning, fontSize: 14, marginTop: space.sm },

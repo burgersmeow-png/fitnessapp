@@ -1,5 +1,6 @@
 // What a follower's creator has pinned (set on the creator's dashboard), shown on Today. Pure.
 
+import type { CardContent } from './shareCard';
 export interface Pin {
   /** w = workout, p = plan, c = challenge: the same letters the links use. */
   kind: 'w' | 'p' | 'c';
@@ -70,4 +71,28 @@ export function starterPin(pins: Pin[]): Pin | null {
 export function starterLabel(name: string, pin: Pin): string {
   const verb = { p: 'Follow', w: 'Start', c: 'Join' }[pin.kind];
   return `${verb} ${name}’s ${pin.title}`;
+}
+
+export interface CrewPlaceLike {
+  place: number;
+  nickname: string;
+  days: number;
+  me: boolean;
+}
+
+/** The story card for someone's place on their creator's weekly leaderboard. */
+export function crewCardContent(creator: string, me: CrewPlaceLike, top: CrewPlaceLike[], total: number): CardContent {
+  return {
+    eyebrow: `${creator.toUpperCase()}’S CREW · THIS WEEK`,
+    headline: me.place === 1 ? 'TOP OF THE CREW' : `#${me.place} IN THE CREW`,
+    stats: [
+      { value: `#${me.place}`, label: 'PLACE' },
+      { value: String(me.days), label: me.days === 1 ? 'TRAINING DAY' : 'TRAINING DAYS' },
+      { value: String(Math.max(total, 1)), label: 'IN THE CREW' },
+    ],
+    // The top three, with me swapped in for the third if I'm not already there.
+    lines: (top.slice(0, 3).some((p) => p.me) ? top.slice(0, 3) : [...top.slice(0, 2), me]).map((p) => ({ name: `${p.place}. ${p.nickname}${p.me ? ' (me)' : ''}`, detail: `${p.days} ${p.days === 1 ? 'day' : 'days'}`, pr: p.me })),
+    more: 0,
+    footer: `Train with ${creator} on LiftLab`,
+  };
 }
