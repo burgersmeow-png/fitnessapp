@@ -1,10 +1,14 @@
-# Publishes site/ (the page creators' links open) to GitHub Pages on every push to main.
+# Publishes site/ (the page creators' links open) and the browser version of the app (at /app)
+# to GitHub Pages on every push to main.
 # One-time setup: repo Settings > Pages > Build and deployment > Source: GitHub Actions.
-name: Landing page
+# Optional repo variables (Settings > Secrets and variables > Actions > Variables):
+# EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SERVER_URL. Without them the
+# browser app still works, it just keeps everything on the device.
+name: Landing page and browser app
 on:
   push:
     branches: [main]
-    paths: ['site/**', '.github/workflows/pages.yml']
+    paths: ['site/**', 'src/**', 'assets/**', 'app.json', 'app.config.js', 'package-lock.json', 'scripts/build-web.mjs', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,9 +25,20 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: cp -r site _site
+      - run: node scripts/build-web.mjs _site/app "/${{ github.event.repository.name }}/app"
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_SERVER_URL: ${{ vars.EXPO_PUBLIC_SERVER_URL }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

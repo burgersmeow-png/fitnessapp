@@ -4,4 +4,6 @@ window.LIFTLAB = {
   serverUrl: '',
   // The App Store listing, e.g. https://apps.apple.com/app/id1234567890
   appStoreUrl: '',
+  // The browser version of the app, e.g. 'app/' (built by scripts/build-web.mjs). Empty hides the links.
+  webAppUrl: '',
 };

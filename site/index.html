@@ -71,6 +71,7 @@
     .workout li:first-child { border-top: 0; }
     .workout .lift { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .workout .sets { color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .browser { display: block; margin-top: 12px; color: var(--text); font-weight: 700; text-align: center; text-underline-offset: 3px; }
     .open { display: flex; width: 100%; margin-top: 16px; background: var(--accent); color: var(--accent-text); font-size: 18px; }
     .error { color: #f5b53d; }
     [hidden] { display: none !important; }
@@ -91,6 +92,7 @@
       <h2 id="workout-title" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
       <ol id="lifts"></ol>
       <a class="button open" id="open-app" href="#">Open in LiftLab</a>
+      <a class="browser" id="open-app-web" href="#" hidden>No iPhone? Try it in your browser</a>
       <p class="code-note">Weights are picked from your own history in the app. New to LiftLab? Install it, then come back and tap this button.</p>
     </section>
 
@@ -99,6 +101,7 @@
       <h2 id="plan-count" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
       <ol id="plan-days"></ol>
       <a class="button open" id="open-plan" href="#">Follow in LiftLab</a>
+      <a class="browser" id="open-plan-web" href="#" hidden>No iPhone? Try it in your browser</a>
       <p class="code-note">Days go in order, one per session, with weights from your own history. New to LiftLab? Install it, then come back and tap this button.</p>
     </section>
 
@@ -107,6 +110,7 @@
       <h2 id="challenge-rules" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
       <p class="code-note">Lifting and cardio both count, once per day. Day 1 is the day you join.</p>
       <a class="button open" id="open-challenge" href="#">Join in LiftLab</a>
+      <a class="browser" id="open-challenge-web" href="#" hidden>No iPhone? Try it in your browser</a>
       <p class="code-note">New to LiftLab? Install it, then come back and tap this button.</p>
     </section>
 
@@ -120,6 +124,7 @@
     </section>
 
     <a class="button primary" id="download" href="#" aria-disabled="true">Coming soon to the App Store</a>
+    <a class="browser" id="download-web" href="#" hidden>Try it in your browser</a>
 
     <ul class="points">
       <li><span class="dot" aria-hidden="true">1</span><div><b>A plan for today, every day</b><span>Picks muscles you’ve recovered and weights that go up when you’re ready.</span></div></li>
@@ -257,6 +262,17 @@
         } catch (e) {
           return null;
         }
+      }
+
+      // The browser version of the app (config.js webAppUrl), for people without an iPhone.
+      if (cfg.webAppUrl) {
+        var base = cfg.webAppUrl.replace(/\/$/, '') + '/';
+        var tail = code.length >= 3 && code.length <= 20 ? '&code=' + code : '';
+        var web = function (id, path) { $(id).href = base + path + tail; $(id).hidden = false; };
+        if (workout) web('open-app-web', 'try?w=' + params.get('w'));
+        else if (challenge) web('open-challenge-web', 'challenge?c=' + params.get('c'));
+        else if (plan) web('open-plan-web', 'plan?p=' + params.get('p'));
+        else { $('download-web').href = base; $('download-web').hidden = false; }
       }
 
       if (code.length < 3 || code.length > 20) return;
