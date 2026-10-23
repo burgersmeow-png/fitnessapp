@@ -175,7 +175,11 @@ workout rides inside the link (`?w=…`, see `src/lib/workoutLink.ts`), so no se
 Today → **Start a challenge** sets a goal like 12 training days in 4 weeks (`src/lib/challenge.ts`).
 **Invite people** shares a link (`?c=…`) that opens the landing page and then `liftlab://challenge?c=…`,
 where followers join with one tap. Each phone counts its own training days; lifting and cardio both
-count, once per day. **Share story** makes a progress card. No server is involved.
+count, once per day. **Share story** makes a progress card.
+
+Signed-in people also see **friends in the same challenge**, ranked by sessions. That uses the
+`challenge_entries` table (`supabase/migrations/20261023050000_challenge_entries.sql`): only accepted
+friends can read a row and only its owner can write it. The challenge itself works without an account.
 
 ## Creator codes (influencer promotion)
 

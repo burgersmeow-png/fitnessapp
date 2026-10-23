@@ -111,3 +111,15 @@ export function challengeCardContent(c: JoinedChallenge, p: ChallengeProgress): 
     footer: 'Join me on LiftLab',
   };
 }
+
+export interface BoardEntry {
+  userId: string;
+  name: string;
+  done: number;
+}
+
+/** Most sessions first; ties share a place. Marks you. */
+export function rankBoard(entries: BoardEntry[], me: string): (BoardEntry & { place: number; me: boolean })[] {
+  const sorted = [...entries].sort((a, b) => b.done - a.done || a.name.localeCompare(b.name));
+  return sorted.map((e) => ({ ...e, place: 1 + sorted.findIndex((x) => x.done === e.done), me: e.userId === me }));
+}

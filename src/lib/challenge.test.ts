@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { challengeCardContent, challengeProgress, challengeUrl, cleanChallenge, decodeChallenge, encodeChallenge, type JoinedChallenge } from './challenge';
+import { challengeCardContent, challengeProgress, challengeUrl, cleanChallenge, decodeChallenge, encodeChallenge, rankBoard, type JoinedChallenge } from './challenge';
 
 const at = (d: number, h = 9) => new Date(2026, 9, d, h).toISOString();
 const c: JoinedChallenge = { title: 'October grind', sessions: 4, days: 7, start: '2026-10-05' };
@@ -46,4 +46,16 @@ test('the share card shows the day while active and the result after', () => {
   assert.equal(card.headline, 'DAY 3 OF 7');
   assert.deepEqual(card.stats.map((s) => s.value), ['2/4', '4', '50%']);
   assert.equal(challengeCardContent(c, { ...p, status: 'won', done: 4 }).headline, 'CHALLENGE WON');
+});
+
+test('the board ranks by sessions, ties share a place', () => {
+  const board = rankBoard(
+    [
+      { userId: 'a', name: 'Ann', done: 3 },
+      { userId: 'b', name: 'Bob', done: 5 },
+      { userId: 'c', name: 'Cat', done: 3 },
+    ],
+    'c',
+  );
+  assert.deepEqual(board.map((e) => [e.name, e.place, e.me]), [['Bob', 1, false], ['Ann', 2, false], ['Cat', 2, true]]);
 });

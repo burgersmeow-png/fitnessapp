@@ -40,6 +40,7 @@ import { WorkoutLinkSheet } from '../components/WorkoutLinkSheet';
 import { linkFromSets, type WorkoutLink } from '../lib/workoutLink';
 import { challengeCardContent, type ChallengeProgress, type JoinedChallenge } from '../lib/challenge';
 import { freshWin } from '../services/challenge';
+import { syncChallengeEntry } from '../services/challengeBoard';
 import { cardContent, type CardContent } from '../lib/shareCard';
 import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
@@ -372,6 +373,7 @@ export default function WorkoutScreen() {
       const goal = settings?.weeklyGoal ?? 3;
       const [badges, dates] = await Promise.all([checkBadges(db, goal), loadSessionDates(db)]);
       const won = await freshWin(db, dates).catch(() => null);
+      syncChallengeEntry(db).catch(() => {});
       // Celebrated here, so Today doesn't repeat them.
       if (badges.fresh.length) markBadgesSeen(db);
       const minutes = Math.max(1, Math.round((Date.now() - startedAt.current) / 6e4));

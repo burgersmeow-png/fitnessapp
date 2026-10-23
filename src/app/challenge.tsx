@@ -12,6 +12,7 @@ import type { CardContent } from '../lib/shareCard';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { joinChallenge, leaveChallenge, loadChallenge } from '../services/challenge';
+import { loadBoard, syncChallengeEntry, type Board } from '../services/challengeBoard';
 import { loadSessionDates } from '../services/habits';
 import { SITE_URL } from '../services/server';
 import { shareLink } from '../services/shareLink';
@@ -27,16 +28,23 @@ export default function ChallengeScreen() {
   const [title, setTitle] = useState('');
   const [data, reload] = useFocusData(async () => {
     const [joined, dates] = await Promise.all([loadChallenge(db), loadSessionDates(db)]);
-    return { joined, dates, invite: decodeChallenge(c) };
+    // Friends' progress is a bonus: offline or signed out, the screen works without it.
+    let board: Board | null = null;
+    if (joined) {
+      await syncChallengeEntry(db).catch(() => {});
+      board = await loadBoard(joined).catch(() => null);
+    }
+    return { joined, dates, invite: decodeChallenge(c), board };
   }, [c]);
   if (!data) return <Loading />;
-  const { joined, dates, invite } = data;
+  const { joined, dates, invite, board } = data;
   const progress = joined ? challengeProgress(joined, dates, new Date()) : null;
   const sameAsInvite = invite && joined && invite.title === joined.title && invite.sessions === joined.sessions && invite.days === joined.days;
 
   const join = (def: ChallengeDef) => {
     const run = async () => {
       await joinChallenge(db, def);
+      await syncChallengeEntry(db).catch(() => {});
       if (invite) router.setParams({ c: undefined });
       reload();
     };
@@ -46,6 +54,7 @@ export default function ChallengeScreen() {
   const leave = () =>
     confirm('Leave this challenge?', 'Your workouts stay in History.', 'Leave', async () => {
       await leaveChallenge(db);
+      await syncChallengeEntry(db).catch(() => {});
       reload();
     }, true);
   const invitePeople = async (def: ChallengeDef) => {
@@ -99,6 +108,30 @@ export default function ChallengeScreen() {
             <Button title="Invite people" variant="secondary" onPress={() => invitePeople(joined)} style={{ flex: 1 }} />
           </View>
           {status && <Text style={styles.status}>{status}</Text>}
+          {board && (
+            <>
+              <SectionLabel>Friends in this challenge</SectionLabel>
+              {!board.signedIn ? (
+                <Text style={styles.sub}>Sign in on the Friends tab to see how your friends in this challenge are doing.</Text>
+              ) : board.entries.length <= 1 ? (
+                <Text style={styles.sub}>No friends in it yet. Tap Invite people and send them the link.</Text>
+              ) : (
+                <Card>
+                  {board.entries.map((e, i) => (
+                    <View key={e.userId} style={[styles.boardRow, i > 0 && styles.divider]}>
+                      <Text style={styles.place}>{e.place}</Text>
+                      <Text style={[styles.boardName, e.me && { color: colors.accent }]} numberOfLines={1}>
+                        {e.me ? 'You' : e.name}
+                      </Text>
+                      <Text style={styles.boardDone}>
+                        {e.done}/{joined.sessions}
+                      </Text>
+                    </View>
+                  ))}
+                </Card>
+              )}
+            </>
+          )}
           {progress.status === 'active' && (
             <Pressable onPress={leave} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: space.md }}>
               <Text style={styles.leave}>Leave challenge</Text>
@@ -154,6 +187,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   status: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginTop: space.sm },
   notNow: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
+  boardRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 },
+  divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  place: { width: 24, color: colors.textMuted, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  boardName: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '600' },
+  boardDone: { color: colors.text, fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
   leave: { color: colors.danger, fontSize: 15, fontWeight: '600' },
   input: { minHeight: 48, borderRadius: radius.sm, backgroundColor: colors.surface, color: colors.text, paddingHorizontal: space.md, fontSize: 16, marginBottom: space.sm },
   preset: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: colors.surface, marginBottom: space.sm, minHeight: 64 },

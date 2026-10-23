@@ -201,3 +201,38 @@ test('creator code rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABA
   }
   await ann.c.rpc('delete_account');
 });
+
+test('challenge leaderboard rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_ANON_KEY' }, async () => {
+  const ann = await user('cann');
+  const bob = await user('cbob');
+  const eve = await user('ceve');
+  const entry = { challenge_key: 'WzEsIjEyIGluIDQgd2Vla3MiLDEyLDI4XQ', title: '12 in 4 weeks', sessions: 12, days: 28, start_day: '2026-10-01', done: 3 };
+
+  assert.ifError((await ann.c.from('challenge_entries').upsert(entry)).error);
+  // Progress can't go past the goal, and nobody can write someone else's row.
+  assert.ok((await ann.c.from('challenge_entries').upsert({ ...entry, done: 13 })).error);
+  assert.ok((await eve.c.from('challenge_entries').insert({ ...entry, user_id: ann.id })).error);
+  await eve.c.from('challenge_entries').update({ done: 0 }).eq('user_id', ann.id);
+  assert.equal((await ann.c.from('challenge_entries').select('done').eq('user_id', ann.id).single()).data.done, 3);
+
+  // Only accepted friends see it.
+  assert.equal((await bob.c.from('challenge_entries').select().eq('user_id', ann.id)).data.length, 0);
+  assert.ifError((await bob.c.from('friendships').insert({ requester: bob.id, addressee: ann.id })).error);
+  assert.equal((await bob.c.from('challenge_entries').select().eq('user_id', ann.id)).data.length, 0);
+  assert.ifError((await ann.c.from('friendships').update({ status: 'accepted' }).eq('requester', bob.id).eq('addressee', ann.id)).error);
+  const board = await bob.c
+    .from('challenge_entries')
+    .select('done, author:profiles!challenge_entries_user_id_fkey(display_name)')
+    .eq('challenge_key', entry.challenge_key);
+  assert.ifError(board.error);
+  assert.deepEqual(board.data, [{ done: 3, author: { display_name: 'cann' } }]);
+  assert.equal((await eve.c.from('challenge_entries').select()).data.length, 0);
+
+  const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  assert.ok((await anon.from('challenge_entries').select()).error || (await anon.from('challenge_entries').select()).data.length === 0);
+
+  // Leaving deletes the row; deleting the account removes it too.
+  assert.ifError((await ann.c.from('challenge_entries').delete().eq('user_id', ann.id)).error);
+  assert.equal((await bob.c.from('challenge_entries').select().eq('user_id', ann.id)).data.length, 0);
+  for (const u of [ann, bob, eve]) await u.c.rpc('delete_account');
+});
