@@ -103,3 +103,14 @@ export function parsePinsRequest(body: unknown): { code: string; token: string; 
   if (pins.length > MAX_PINS) return null;
   return { ...auth, pins, bad };
 }
+
+/** Link opens per day for the last `days` days (UTC), oldest first, from per-day rows. */
+export function dailyOpens(rows: { day: string; opens: number }[], now: Date, days = 14): { day: string; count: number }[] {
+  const out = dailyCounts([], now, days);
+  const index = new Map(out.map((d, i) => [d.day, i]));
+  for (const r of rows) {
+    const i = index.get(r.day.slice(0, 10));
+    if (i != null) out[i].count += r.opens;
+  }
+  return out;
+}

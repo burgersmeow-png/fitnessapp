@@ -311,6 +311,8 @@
       $('copy').addEventListener('click', copy);
 
       if (!cfg.serverUrl) return;
+      // Counts the visit on the creator's dashboard. Plain text, so no CORS preflight.
+      if (navigator.sendBeacon) navigator.sendBeacon(cfg.serverUrl.replace(/\/$/, '') + '/ref/open', JSON.stringify({ code: code }));
       fetch(cfg.serverUrl.replace(/\/$/, '') + '/ref/check?code=' + encodeURIComponent(code))
         .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
         .then(function (r) {
