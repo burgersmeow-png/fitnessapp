@@ -24,6 +24,7 @@ import {
 import { formatClock, formatNumber, MUSCLE_LABELS } from '../lib/format';
 import { adjustNextSet, estimate1RM, personalRecords, suggestWeight } from '../lib/progression';
 import { swapOptions } from '../lib/swap';
+import { groupSets } from '../lib/repeat';
 import { colors, radius, space, TAP, type } from '../lib/theme';
 import type { Exercise, LoggedSet, Settings } from '../lib/types';
 import { cancelRestAlert, scheduleRestAlert } from '../services/restAlert';
@@ -124,15 +125,7 @@ export default function WorkoutScreen() {
     return () => clearInterval(timer);
   }, [restEndsAt]);
 
-  const groups = useMemo(() => {
-    const out: { exerciseId: string; sets: WorkoutSet[] }[] = [];
-    for (const s of sets) {
-      const last = out.at(-1);
-      if (last && last.exerciseId === s.exerciseId) last.sets.push(s);
-      else out.push({ exerciseId: s.exerciseId, sets: [s] });
-    }
-    return out;
-  }, [sets]);
+  const groups = useMemo(() => groupSets(sets), [sets]);
 
   const done = sets.filter((s) => s.completedAt).length;
 

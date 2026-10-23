@@ -339,6 +339,17 @@ export async function loadWorkouts(db: SQLiteDatabase): Promise<WorkoutSummary[]
   return rows.map((r) => ({ ...r, volume: fromKg(r.volume) }));
 }
 
+export async function loadWorkout(db: SQLiteDatabase, id: number): Promise<{ id: number; startedAt: string; finishedAt: string | null } | null> {
+  return db.getFirstAsync('SELECT id, started_at AS startedAt, finished_at AS finishedAt FROM workouts WHERE id = ?', id);
+}
+
+export async function deleteWorkout(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM sets WHERE workout_id = ?', id);
+    await db.runAsync('DELETE FROM workouts WHERE id = ?', id);
+  });
+}
+
 export async function saveCardio(db: SQLiteDatabase, c: CardioSession): Promise<void> {
   await db.runAsync(
     'INSERT INTO cardio (type, started_at, minutes, distance, rpe) VALUES (?, ?, ?, ?, ?)',

@@ -1,5 +1,6 @@
 import { useSQLiteContext } from 'expo-sqlite';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { confirm } from '../components/confirm';
 import { Icon } from '../components/Icon';
 import { Button, Loading } from '../components/ui';
 import { MUSCLE_LABELS } from '../lib/format';
@@ -9,18 +10,6 @@ import { useFocusData } from '../lib/useData';
 import { loadProgram, startProgram, stopProgram } from '../services/programs';
 
 const LEVEL_COLOR = { Beginner: colors.success, Intermediate: colors.warning, Advanced: colors.danger };
-
-/** Web previews have no Alert buttons, so they use the browser's confirm. */
-function confirm(title: string, message: string, action: string, run: () => void) {
-  if (Platform.OS === 'web') {
-    if (window.confirm(`${title}\n\n${message}`)) run();
-    return;
-  }
-  Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: action, onPress: run },
-  ]);
-}
 
 export default function ProgramsScreen() {
   const db = useSQLiteContext();

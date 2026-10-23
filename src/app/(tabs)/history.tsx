@@ -106,23 +106,31 @@ export default function HistoryScreen() {
         }
         const w = item.workout;
         return (
-          <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={styles.icon}>
-              <Icon name="exercises" size={22} color={colors.accent} />
-            </View>
-            <View style={{ flex: 1, marginLeft: space.md }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={type.title}>{formatDate(w.startedAt)}</Text>
-                <Text style={styles.meta}>{formatDuration(w.startedAt, w.finishedAt)}</Text>
+          <Pressable
+            onPress={() => router.push(`/session/${w.id}`)}
+            accessibilityRole="button"
+            accessibilityHint="Shows the sets, and lets you do it again"
+            style={({ pressed }) => pressed && { opacity: 0.75 }}
+          >
+            <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={styles.icon}>
+                <Icon name="exercises" size={22} color={colors.accent} />
               </View>
-              <Text style={styles.meta}>
-                {w.sets} {w.sets === 1 ? 'set' : 'sets'} · {formatNumber(w.volume)} {settings.units} volume
-              </Text>
-              <Text style={[type.body, { marginTop: space.xs }]} numberOfLines={2}>
-                {w.exercises.split(',').join(', ')}
-              </Text>
-            </View>
-          </Card>
+              <View style={{ flex: 1, marginLeft: space.md }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={type.title}>{formatDate(w.startedAt)}</Text>
+                  <Text style={styles.meta}>{formatDuration(w.startedAt, w.finishedAt)}</Text>
+                </View>
+                <Text style={styles.meta}>
+                  {w.sets} {w.sets === 1 ? 'set' : 'sets'} · {formatNumber(w.volume)} {settings.units} volume
+                </Text>
+                <Text style={[type.body, { marginTop: space.xs }]} numberOfLines={2}>
+                  {w.exercises.split(',').join(', ')}
+                </Text>
+              </View>
+              <Icon name="chevron" size={18} color={colors.textMuted} />
+            </Card>
+          </Pressable>
         );
       }}
     />
