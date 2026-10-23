@@ -168,3 +168,48 @@ export function pinsWithUses(pins: Pin[], rows: { pin_hash: string }[]): (Pin & 
   for (const r of rows) counts.set(r.pin_hash, (counts.get(r.pin_hash) ?? 0) + 1);
   return pins.map((p) => ({ ...p, uses: counts.get(pinHash(p.payload)) ?? 0 }));
 }
+
+const NICKNAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{1,19}$/;
+// Kept short on purpose: obvious slurs and impersonation. The creator can ask for a name to be removed.
+const BLOCKED = /(admin|liftlab|official|nigg|fag|retard|cunt)/i;
+
+/** A follower joining their creator's weekly leaderboard. */
+export function parseCrewJoin(body: unknown): { installId: string; nickname: string } | null {
+  const b = body as { installId?: unknown; nickname?: unknown } | null;
+  if (!validInstall(b?.installId) || typeof b?.nickname !== 'string') return null;
+  const nickname = b.nickname.trim().replace(/\s+/g, ' ');
+  return NICKNAME.test(nickname) && !BLOCKED.test(nickname) ? { installId: b.installId as string, nickname } : null;
+}
+
+/** A follower's training days so far this week. */
+export function parseCrewSync(body: unknown): { installId: string; days: number } | null {
+  const b = body as { installId?: unknown; days?: unknown } | null;
+  if (!validInstall(b?.installId) || typeof b?.days !== 'number' || !Number.isInteger(b.days) || b.days < 0 || b.days > 7) return null;
+  return { installId: b.installId as string, days: b.days };
+}
+
+/** Monday (UTC) of the week `now` falls in, as YYYY-MM-DD: the leaderboard's week. */
+export function crewWeek(now: Date): string {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+export interface CrewRow {
+  install_id: string;
+  nickname: string;
+  days: number;
+  updated_at: string;
+}
+
+/**
+ * The week's board: the top `size` by training days (ties share a place; whoever got there first
+ * is listed first), plus the asker's own place if they're further down. Install ids never leave.
+ */
+export function crewBoard(rows: CrewRow[], me: string, size = 10) {
+  const sorted = rows.filter((r) => r.days > 0 || r.install_id === me).sort((a, b) => b.days - a.days || a.updated_at.localeCompare(b.updated_at));
+  const placed = sorted.map((r) => ({ place: 1 + sorted.findIndex((x) => x.days === r.days), nickname: r.nickname, days: r.days, me: r.install_id === me }));
+  const top = placed.slice(0, size);
+  const mine = placed.find((p) => p.me) ?? null;
+  return { top, me: mine, total: placed.filter((p) => p.days > 0).length };
+}

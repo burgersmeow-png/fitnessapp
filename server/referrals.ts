@@ -2,7 +2,7 @@
 // it active after their first workout. No sign-in needed, since most people never make an account.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readJson, send } from './http';
-import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePinsRequest, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
+import { canAlert, chunks, crewBoard, crewWeek, parseCrewJoin, parseCrewSync, type CrewRow, dailyCounts, dailyOpens, newPins, parseClaim, parsePinsRequest, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parseStatsRequest, rateLimiter, tokensMatch, validCode, validInstall } from './referralRules';
 import { admin, databaseConfigured } from './supabase';
 import type { Pin } from './referralRules';
 
@@ -89,6 +89,40 @@ export async function handleReferrals(req: IncomingMessage, res: ServerResponse)
         if (error) throw error;
       }
       return send(res, 200, { ok: true }), true;
+    }
+    if (req.method === 'POST' && url.pathname.startsWith('/ref/crew/')) {
+      // A creator's weekly leaderboard. POST throughout so install ids stay out of URLs and logs.
+      const body = await readJson(req, 512);
+      const installId = (body as { installId?: unknown } | null)?.installId;
+      if (!validInstall(installId)) return send(res, 400, { error: 'Bad request' }), true;
+      const { data: ref } = await admin().from('referrals').select('code').eq('install_id', installId).maybeSingle();
+      const creator = ref ? await lookup(ref.code) : null;
+      if (!creator) return send(res, 404, { error: 'Add a creator code first.' }), true;
+      const week = crewWeek(new Date());
+      const action = url.pathname.slice('/ref/crew/'.length);
+      if (action === 'join') {
+        const ask = parseCrewJoin(body);
+        if (!ask) return send(res, 400, { error: 'Pick a name of 2 to 20 letters or numbers.' }), true;
+        const { data: was } = await admin().from('creator_crew').select('week, days').eq('install_id', installId).maybeSingle();
+        const { error } = await admin()
+          .from('creator_crew')
+          .upsert({ install_id: installId, code: creator.code, nickname: ask.nickname, week, days: was?.week === week ? was.days : 0, updated_at: new Date().toISOString() });
+        if (error) throw error;
+      } else if (action === 'sync') {
+        const ask = parseCrewSync(body);
+        if (!ask) return send(res, 400, { error: 'Bad request' }), true;
+        const { error } = await admin().from('creator_crew').update({ week, days: ask.days, updated_at: new Date().toISOString() }).eq('install_id', installId);
+        if (error) throw error;
+      } else if (action === 'leave') {
+        const { error } = await admin().from('creator_crew').delete().eq('install_id', installId);
+        if (error) throw error;
+        return send(res, 200, { ok: true }), true;
+      } else if (action !== 'board') {
+        return send(res, 404, { error: 'Not found' }), true;
+      }
+      const { data: rows } = await admin().from('creator_crew').select('install_id, nickname, days, updated_at').eq('code', creator.code).eq('week', week);
+      const board = crewBoard((rows ?? []) as CrewRow[], installId);
+      return send(res, 200, { creatorName: creator.creator_name, week, ...board }), true;
     }
     if (req.method === 'POST' && url.pathname === '/ref/claim') {
       const claim = parseClaim(await readJson(req, 512));

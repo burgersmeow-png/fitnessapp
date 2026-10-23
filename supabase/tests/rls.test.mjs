@@ -200,6 +200,7 @@ test('creator code rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABA
     assert.ok((await c.from('referrals').insert({ install_id: `${run}-0000-0000-0000`, code: 'ALEX10' })).error);
     assert.ok((await c.from('creator_link_opens').select()).error);
     assert.ok((await c.from('creator_pin_uses').select()).error);
+    assert.ok((await c.from('creator_crew').select()).error);
     assert.ok((await c.rpc('count_link_open', { p_code: 'ALEX10' })).error);
   }
   await ann.c.rpc('delete_account');

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
+import { canAlert, chunks, crewBoard, crewWeek, parseCrewJoin, parseCrewSync, dailyCounts, dailyOpens, newPins, parseClaim, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
 
 test('claims need a real code and install id', () => {
   const installId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -106,4 +106,33 @@ test('pin uses are counted per pin', () => {
   assert.deepEqual(pinsWithUses([a, b], rows).map((p) => p.uses), [2, 0]);
   assert.deepEqual(parseUseRequest({ installId: 'abcdef0123456789', payload: 'aaaaaaaa' }), { installId: 'abcdef0123456789', payload: 'aaaaaaaa' });
   assert.equal(parseUseRequest({ installId: 'abcdef0123456789', payload: '<b>' }), null);
+});
+
+test('crew nicknames are short, plain and not impersonating', () => {
+  const installId = 'abcdef0123456789';
+  assert.deepEqual(parseCrewJoin({ installId, nickname: '  Sam   B ' }), { installId, nickname: 'Sam B' });
+  assert.equal(parseCrewJoin({ installId, nickname: 'S' }), null);
+  assert.equal(parseCrewJoin({ installId, nickname: '<script>' }), null);
+  assert.equal(parseCrewJoin({ installId, nickname: 'LiftLab_Official' }), null);
+  assert.equal(parseCrewJoin({ installId, nickname: 'x'.repeat(21) }), null);
+  assert.deepEqual(parseCrewSync({ installId, days: 3 }), { installId, days: 3 });
+  assert.equal(parseCrewSync({ installId, days: 9 }), null);
+  assert.equal(parseCrewSync({ installId, days: 1.5 }), null);
+});
+
+test('the crew week starts on Monday (UTC)', () => {
+  assert.equal(crewWeek(new Date('2026-10-23T12:00:00Z')), '2026-10-19');
+  assert.equal(crewWeek(new Date('2026-10-19T00:30:00Z')), '2026-10-19');
+  assert.equal(crewWeek(new Date('2026-10-18T23:30:00Z')), '2026-10-12');
+});
+
+test('the crew board ranks by days, ties share a place, and shows me if I am further down', () => {
+  const row = (id: string, days: number, at: string) => ({ install_id: id, nickname: id.toUpperCase(), days, updated_at: at });
+  const rows = [row('a', 3, '2026-10-21'), row('b', 5, '2026-10-22'), row('c', 3, '2026-10-20'), row('d', 1, '2026-10-20'), row('e', 0, '2026-10-20')];
+  const board = crewBoard(rows, 'd', 2);
+  assert.deepEqual(board.top.map((p) => [p.nickname, p.place]), [['B', 1], ['C', 2]]);
+  assert.deepEqual(board.me, { place: 4, nickname: 'D', days: 1, me: true });
+  assert.equal(board.total, 4);
+  assert.equal(crewBoard(rows, 'e').me?.days, 0);
+  assert.equal(crewBoard(rows, 'zzz').me, null);
 });
