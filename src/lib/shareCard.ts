@@ -61,3 +61,37 @@ export function cardContent(w: CardInput, locale?: string): CardContent {
     footer: 'Planned and tracked with LiftLab',
   };
 }
+
+export interface PrCardInput {
+  exercise: string;
+  weight: number;
+  reps: number;
+  /** Estimated 1-rep max after the PR. */
+  e1rm: number;
+  /** How much the estimated max went up. */
+  gain: number;
+  at: string;
+  units: 'kg' | 'lb';
+}
+
+/** The card for one personal record, posted from the records page. */
+export function prCardContent(p: PrCardInput, locale?: string): CardContent {
+  const day = new Date(p.at).toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase();
+  const u = p.units.toUpperCase();
+  const before = Math.round(p.e1rm - p.gain);
+  return {
+    eyebrow: `PERSONAL RECORD · ${day}`,
+    headline: 'NEW PR',
+    stats: [
+      { value: compactNumber(p.weight), label: `${u} × ${p.reps} REP${p.reps === 1 ? '' : 'S'}` },
+      { value: compactNumber(p.e1rm), label: `EST. MAX ${u}` },
+      { value: `+${compactNumber(p.gain)}`, label: `${u} GAINED` },
+    ],
+    lines: [
+      { name: p.exercise, detail: `${p.weight} ${p.units} × ${p.reps}`, pr: true },
+      { name: 'Previous best', detail: before > 0 ? `Est. max ${before.toLocaleString('en-US')} ${p.units}` : 'First time beating the baseline', pr: false },
+    ],
+    more: 0,
+    footer: 'Planned and tracked with LiftLab',
+  };
+}

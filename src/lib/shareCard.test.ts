@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cardContent, compactNumber, type CardInput } from './shareCard';
+import { cardContent, compactNumber, prCardContent, type CardInput } from './shareCard';
 
 const base: CardInput = {
   startedAt: new Date(2026, 9, 23, 7).toISOString(),
@@ -39,4 +39,19 @@ test('PR lifts lead and long workouts are trimmed', () => {
   assert.deepEqual(c.lines.slice(0, 2).map((l) => [l.name, l.pr]), [['Barbell Bench Press', true], ['D', true]]);
   assert.equal(c.lines.length, 5);
   assert.equal(c.more, 2);
+});
+
+test('a single PR card leads with the lift and shows the gain', () => {
+  const c = prCardContent({ exercise: 'Back Squat', weight: 245, reps: 5, e1rm: 285.8, gain: 12.2, at: new Date(2026, 9, 23, 7).toISOString(), units: 'lb' }, 'en-US');
+  assert.equal(c.headline, 'NEW PR');
+  assert.match(c.eyebrow, /^PERSONAL RECORD · FRI, OCT 23$/);
+  assert.deepEqual(c.stats.map((s) => s.value), ['245', '286', '+12']);
+  assert.equal(c.stats[0].label, 'LB × 5 REPS');
+  assert.deepEqual(c.lines[0], { name: 'Back Squat', detail: '245 lb × 5', pr: true });
+  assert.equal(c.lines[1].detail, 'Est. max 274 lb');
+});
+
+test('a one-rep PR says REP, not REPS', () => {
+  const c = prCardContent({ exercise: 'Deadlift', weight: 180, reps: 1, e1rm: 180, gain: 5, at: new Date().toISOString(), units: 'kg' });
+  assert.equal(c.stats[0].label, 'KG × 1 REP');
 });

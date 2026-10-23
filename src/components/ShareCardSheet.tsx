@@ -9,7 +9,17 @@ import { CARD_H, CARD_W, ShareCard } from './ShareCard';
 import { Button } from './ui';
 
 /** Full-screen preview of the share card with a button to post it. */
-export function ShareCardSheet({ content, onClose }: { content: CardContent | null; onClose: () => void }) {
+export function ShareCardSheet({
+  content,
+  onClose,
+  title = 'Share your workout',
+  fileName = 'liftlab-workout.png',
+}: {
+  content: CardContent | null;
+  onClose: () => void;
+  title?: string;
+  fileName?: string;
+}) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const ref = useRef<Svg>(null);
@@ -20,7 +30,7 @@ export function ShareCardSheet({ content, onClose }: { content: CardContent | nu
   const share = async () => {
     setStatus(null);
     try {
-      const r = await shareCardImage(ref.current, 'liftlab-share-card', 'liftlab-workout.png');
+      const r = await shareCardImage(ref.current, 'liftlab-share-card', fileName);
       if (r === 'saved') setStatus('Saved. Post it from your photos or downloads.');
     } catch (e) {
       setStatus(e instanceof Error ? e.message : 'Could not share the card.');
@@ -31,7 +41,7 @@ export function ShareCardSheet({ content, onClose }: { content: CardContent | nu
     <Modal visible={content != null} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.screen, { paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.md }]}>
         <View style={styles.head}>
-          <Text style={type.title}>Share your workout</Text>
+          <Text style={type.title}>{title}</Text>
           <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">
             <Text style={styles.close}>Close</Text>
           </Pressable>
