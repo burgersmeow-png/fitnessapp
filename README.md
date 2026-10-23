@@ -12,8 +12,9 @@ Working name; rename any time in `app.json`.
   and drop into a deload when a lift stalls
 - **Workout**: big tap targets, reps-in-reserve per set, rest timer with haptics, PR detection, end-of-workout
   summary, and the next sets re-weighted on the spot when a set felt easier or harder than planned
-- **Food**: snap a photo of a meal and get calories, protein, carbs and fat from AI, or search common
-  foods and add your own. Daily targets come from your body weight and goal, with a calorie ring and
+- **Food**: snap a photo of a meal and get calories, protein, carbs and fat from AI, scan a packet's
+  barcode (free product data from [Open Food Facts](https://openfoodfacts.org), kept on the phone once
+  scanned), or search common foods and add your own. Daily targets come from your body weight and goal, with a calorie ring and
   macro bars, and today's intake shows on the Today screen
 - **Voice coach**: tap the mic on Today and say "30 minute upper body with dumbbells" or "quick leg day"
   to get a matching workout. During a workout, tap the mic and say "8 reps at 100", "2 left in the tank",
@@ -145,6 +146,7 @@ Code layout:
 - `src/lib/progression.ts` training max, overload, stall and deload logic, mid-workout adjustment, PRs
 - `src/lib/cardio.ts` cardio types and how they load each muscle
 - `src/lib/voice.ts` understands spoken coach commands (offline)
+- `src/lib/barcode.ts` barcode checks and Open Food Facts parsing; `src/services/barcode.ts` the lookup
 - `src/lib/nutrition.ts` calorie and macro targets, totals, photo-estimate checks, common foods
 - `server/` the helper server: meal photo estimates (Claude, prompt in `src/lib/foodPrompt.ts`) and Strava sign-in
 - `src/lib/coaching.ts` client summaries and coach plans; `src/services/coaching.ts` codes, plans, messages
@@ -158,6 +160,5 @@ Code layout:
 
 ## Next
 
-See the plan doc for the full roadmap: Apple Health and Watch, programs, barcode scanning,
-Garmin, always-on voice listening, and trainer payments and push notifications. HealthKit and the Watch
+See the plan doc for the full roadmap: Apple Health and Watch, programs, Garmin, always-on voice listening, and trainer payments and push notifications. HealthKit and the Watch
 app need a development build through EAS and a paid Apple Developer account.

@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BarcodeScan } from '../components/BarcodeScan';
 import { Icon } from '../components/Icon';
 import { MacroLine } from '../components/Nutrition';
 import { Button, Card, Chip, SectionLabel } from '../components/ui';
@@ -27,6 +28,7 @@ import {
   scaleItem,
   sumMacros,
   type FoodItem,
+  type FoodEntry,
   type Meal,
   type PhotoEstimate,
 } from '../lib/nutrition';
@@ -44,6 +46,12 @@ interface DraftItem {
   base: FoodItem;
   servings: number;
 }
+const TABS = {
+  photo: { label: 'Photo', icon: 'camera' },
+  scan: { label: 'Scan', icon: 'barcode' },
+  search: { label: 'Search', icon: 'search' },
+} as const;
+
 let nextKey = 1;
 const draftOf = (base: FoodItem): DraftItem => ({ key: nextKey++, base, servings: 1 });
 
@@ -57,10 +65,10 @@ export default function AddFoodScreen() {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
-  const [tab, setTab] = useState<'photo' | 'search'>(mode === 'photo' ? 'photo' : 'search');
+  const [tab, setTab] = useState<'photo' | 'scan' | 'search'>(mode === 'photo' ? 'photo' : mode === 'scan' ? 'scan' : 'search');
   const [meal, setMeal] = useState<Meal>(mealForTime(new Date()));
   const [draft, setDraft] = useState<DraftItem[]>([]);
-  const [source, setSource] = useState<'photo' | 'quick' | 'manual'>('quick');
+  const [source, setSource] = useState<FoodEntry['source']>('quick');
   const [photo, setPhoto] = useState<PhotoState>({ status: 'idle' });
   const [query, setQuery] = useState('');
   const [custom, setCustom] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
@@ -135,7 +143,7 @@ export default function AddFoodScreen() {
 
       <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
         <View style={styles.segment} accessibilityRole="tablist">
-          {(['photo', 'search'] as const).map((t) => (
+          {(['photo', 'scan', 'search'] as const).map((t) => (
             <Pressable
               key={t}
               onPress={() => setTab(t)}
@@ -143,8 +151,8 @@ export default function AddFoodScreen() {
               accessibilityRole="tab"
               accessibilityState={{ selected: tab === t }}
             >
-              <Icon name={t === 'photo' ? 'camera' : 'search'} size={16} color={tab === t ? colors.text : colors.textMuted} />
-              <Text style={[styles.segmentText, tab === t && { color: colors.text }]}>{t === 'photo' ? 'Photo' : 'Search'}</Text>
+              <Icon name={TABS[t].icon} size={16} color={tab === t ? colors.text : colors.textMuted} />
+              <Text style={[styles.segmentText, tab === t && { color: colors.text }]}>{TABS[t].label}</Text>
             </Pressable>
           ))}
         </View>
@@ -187,6 +195,15 @@ export default function AddFoodScreen() {
               <Button title="Choose photo" variant="secondary" onPress={() => pick(false)} style={{ flex: 1 }} />
             </View>
           </View>
+        )}
+
+        {tab === 'scan' && (
+          <BarcodeScan
+            onAdd={(item) => {
+              setDraft((d) => [...d, draftOf(item)]);
+              if (source !== 'photo') setSource('barcode');
+            }}
+          />
         )}
 
         {tab === 'search' && (

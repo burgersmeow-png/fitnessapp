@@ -24,7 +24,7 @@ export interface FoodEntry extends FoodItem {
   id: number;
   eatenAt: string;
   meal: Meal;
-  source: 'photo' | 'quick' | 'manual';
+  source: 'photo' | 'quick' | 'manual' | 'barcode';
 }
 
 export const DEFAULT_BODY_WEIGHT_KG = 75;

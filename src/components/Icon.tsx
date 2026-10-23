@@ -48,6 +48,7 @@ const ICONS = {
   share: { sf: 'square.and.arrow.up', ion: 'share-outline' },
   message: { sf: 'message.fill', ion: 'chatbubbles' },
   calendar: { sf: 'calendar.badge.plus', ion: 'calendar-outline' },
+  barcode: { sf: 'barcode.viewfinder', ion: 'barcode-outline' },
 } as const satisfies Record<string, { sf: SFSymbol; ion: keyof typeof Ionicons.glyphMap }>;
 
 export type IconName = keyof typeof ICONS;

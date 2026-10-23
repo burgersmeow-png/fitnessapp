@@ -30,10 +30,18 @@
         "expo-image-picker",
         {
           "photosPermission": "Choose a photo of your meal to estimate its calories and macros.",
-          "cameraPermission": "Take a photo of your meal to estimate its calories and macros."
+          "cameraPermission": "Take photos of your meals and scan food barcodes to count calories and macros."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Take photos of your meals and scan food barcodes to count calories and macros.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "scheme": "liftlab",
     "backgroundColor": "#0E0F12"

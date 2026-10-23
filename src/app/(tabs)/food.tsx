@@ -70,6 +70,14 @@ export default function FoodScreen() {
           <Text style={[styles.actionText, { color: colors.accentText }]}>Snap a meal</Text>
         </Pressable>
         <Pressable
+          style={({ pressed }) => [styles.action, styles.actionSmall, pressed && { opacity: 0.85 }]}
+          onPress={() => router.push('/food-add?mode=scan')}
+          accessibilityRole="button"
+          accessibilityLabel="Scan a barcode"
+        >
+          <Icon name="barcode" size={22} color={colors.text} />
+        </Pressable>
+        <Pressable
           style={({ pressed }) => [styles.action, pressed && { opacity: 0.85 }]}
           onPress={() => router.push('/food-add?mode=search')}
           accessibilityRole="button"
@@ -145,6 +153,7 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   actionPrimary: { backgroundColor: colors.accent },
+  actionSmall: { flexGrow: 0, flexShrink: 0, flexBasis: 56, paddingHorizontal: 0 },
   actionText: { color: colors.text, fontSize: 17, fontWeight: '700' },
   empty: { alignItems: 'center', paddingVertical: space.xl, paddingHorizontal: space.lg },
   emptyText: { color: colors.textMuted, fontSize: 15, textAlign: 'center', marginTop: space.xs, lineHeight: 21 },
