@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap';
 import { CoachPlanCard } from '../../components/CoachPlanCard';
 import { CreatorFeedCard } from '../../components/CreatorFeedCard';
+import { CrewCard } from '../../components/CrewCard';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { GoalCard } from '../../components/GoalCard';
 import { ProgressRing } from '../../components/ProgressRing';
@@ -279,6 +280,7 @@ export default function TodayScreen() {
         <Icon name="chevron" size={20} color={colors.textMuted} />
       </Pressable>
 
+      <CrewCard />
       <Pressable
         onPress={() => router.push('/challenge')}
         accessibilityRole="button"

@@ -50,6 +50,7 @@ import { finishAssignedWorkout } from '../services/coaching';
 import { finishProgramWorkout } from '../services/programs';
 import { finishPlanWorkout } from '../services/plan';
 import { flushCreator } from '../services/creatorCode';
+import { syncCrew } from '../services/crew';
 import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habits';
 import { goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/habits';
 import { sharePost } from '../services/social';
@@ -368,7 +369,7 @@ export default function WorkoutScreen() {
       if (finished.length > 0) finishAssignedWorkout(db, workoutId!).catch(() => {});
       if (finished.length > 0) await finishProgramWorkout(db, workoutId!);
       if (finished.length > 0) await finishPlanWorkout(db, workoutId!);
-      if (finished.length > 0) flushCreator(db).catch(() => {});
+      if (finished.length > 0) flushCreator(db).then(() => syncCrew(db)).catch(() => {});
       skipRest();
       if (finished.length === 0) {
         close();

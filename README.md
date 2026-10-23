@@ -238,6 +238,8 @@ creator pins something new, the server sends them a push alert (at most one ever
 creator). Push needs the EAS project id, like coach alerts.
 After the `creator_pin_uses` migration, the dashboard also shows how many followers started each
 pinned workout, followed each plan or joined each challenge.
+After the `creator_crew` migration, followers can join their creator's weekly leaderboard ("Alex's
+crew") from Today with just a nickname; it ranks training days this week.
 
 ## Strava (switched off for now)
 
