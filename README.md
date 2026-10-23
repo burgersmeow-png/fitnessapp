@@ -92,7 +92,7 @@ on the phone; only a summary of each finished session is shared. To set it up (a
    the region closest to you and save the database password somewhere safe.
 2. Open **SQL Editor**. For each file in `supabase/migrations/`, oldest first, start a new query, paste
    the whole file, and press **Run**. Today that's `20261023000000_social.sql`,
-   `20261023010000_coaching.sql`, then `20261023020000_payments.sql`.
+   `20261023010000_coaching.sql`, `20261023020000_payments.sql`, then `20261023030000_push.sql`.
 3. Under **Authentication → Sign In / Providers → Email**, turn off **Confirm email** while you test. The
    free plan only sends a few emails an hour.
 4. Open **Connect** (or **Project Settings → API**) and copy the **Project URL** and the **anon** (or
@@ -111,6 +111,20 @@ press **Restore** in the Supabase dashboard to wake one up.
 
 To check the privacy rules against a test project:
 `SUPABASE_URL=... SUPABASE_ANON_KEY=... npm run test:social` (it creates and deletes throwaway accounts).
+
+## Coach alerts (push notifications)
+
+Coaches and clients get a notification for a new message, a newly assigned workout, and (for coaches) a
+client finishing one. Tapping it opens the right screen. It's free: alerts go through Expo's push service.
+
+1. Create a free account at [expo.dev](https://expo.dev), then in the project folder run
+   `npx eas-cli@latest init`. It adds your project id to `app.json`, which push needs.
+2. Start the server with the Supabase URL and **service_role** key (the same two as for paid coaching):
+   `$env:SUPABASE_URL = "..."`, `$env:SUPABASE_SERVICE_ROLE_KEY = "..."`, then `npm run server`.
+3. On your iPhone in Expo Go, join a coach (or turn on coach mode) and allow notifications.
+
+Push works in Expo Go on iPhone. Android needs a development build for push. The App Store version will
+need an Apple push key, which comes with the paid Apple Developer account.
 
 ## Paid coaching (Stripe)
 

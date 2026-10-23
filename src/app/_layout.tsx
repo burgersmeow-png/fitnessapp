@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ErrorState } from '../components/ui';
 import { DATABASE_NAME, migrate } from '../lib/db';
 import { colors } from '../lib/theme';
+import { useNotificationTaps } from '../services/notifications';
 
 const theme = {
   ...DarkTheme,
@@ -31,6 +32,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 export default function RootLayout() {
+  useNotificationTaps();
   return (
     <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate}>
       <ThemeProvider value={theme}>

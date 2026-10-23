@@ -168,3 +168,22 @@ test('payment rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_AN
 
   for (const u of [coach, client, eve]) await u.c.rpc('delete_account');
 });
+
+test('push token rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_ANON_KEY' }, async () => {
+  const ann = await user('pushann');
+  const bob = await user('pushbob');
+  const token = `ExponentPushToken[${run}-phone]`;
+  assert.ifError((await ann.c.rpc('claim_push_token', { t: token })).error);
+  assert.equal((await ann.c.from('push_tokens').select()).data.length, 1);
+  // Nobody reads or adds tokens directly.
+  assert.equal((await bob.c.from('push_tokens').select()).data.length, 0);
+  assert.ok((await bob.c.from('push_tokens').insert({ token: `ExponentPushToken[${run}-x]`, user_id: ann.id })).error);
+  assert.ok((await ann.c.rpc('claim_push_token', { t: 'not-a-token' })).error);
+  // The same phone signed in as Bob now alerts Bob.
+  assert.ifError((await bob.c.rpc('claim_push_token', { t: token })).error);
+  assert.equal((await ann.c.from('push_tokens').select()).data.length, 0);
+  assert.equal((await bob.c.from('push_tokens').select()).data.length, 1);
+  await bob.c.from('push_tokens').delete().eq('token', token);
+  assert.equal((await bob.c.from('push_tokens').select()).data.length, 0);
+  for (const u of [ann, bob]) await u.c.rpc('delete_account');
+});

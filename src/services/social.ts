@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { loadRecord, saveRecord } from '../lib/db';
 import type { FeedPost, Friendship, NewPost, PostBody, Profile } from '../lib/social';
+import { unregisterPush } from './push';
 import { socialConfigured, supabase } from './supabase';
 
 export class SocialError extends Error {}
@@ -43,6 +44,8 @@ export async function signIn(email: string, password: string): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  // Stop this phone getting the account's coach alerts before the sign-in goes.
+  await unregisterPush().catch(() => {});
   await supabase.auth.signOut();
 }
 

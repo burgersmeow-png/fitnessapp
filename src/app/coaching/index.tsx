@@ -21,6 +21,7 @@ import {
   myCoachCode,
 } from '../../services/coaching';
 import { loadCoachOffer, loadPayouts, paymentsAvailable, refreshPayouts } from '../../services/payments';
+import { registerPush } from '../../services/push';
 import { myId, SocialError } from '../../services/social';
 
 function confirm(title: string, message: string, action: string, onYes: () => void) {
@@ -41,6 +42,8 @@ export default function CoachingScreen() {
   const [data, reload] = useFocusData(async () => {
     const [me, coaching, myCode, assignments] = await Promise.all([myId(), loadCoaching(), existingCoachCode(), loadAssignments()]);
     const sessions = coaching.clients.length ? await loadClientSessions() : [];
+    // Keeps this phone's alert token fresh without asking again.
+    if (coaching.coach || myCode) registerPush({ ask: false });
     let payouts = paymentsAvailable && myCode ? await loadPayouts() : null;
     // Back from Stripe's sign-up: ask whether payments are on yet.
     if (payouts?.connected && !payouts.chargesEnabled) {

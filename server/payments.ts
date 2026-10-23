@@ -3,27 +3,15 @@
 // Only this server writes payment state (with the Supabase service_role key), and only after
 // Stripe confirms it, so the app can never mark anyone as paid.
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createClient } from '@supabase/supabase-js';
 import { baseUrl, BodyTooLarge, readText, send } from './http';
 import { paidState, stripe, StripeError, verifySignature, type StripeSubscription } from './stripe';
+import { admin, caller, databaseConfigured } from './supabase';
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 // Your cut of each payment, if any. 0 means coaches keep everything after Stripe's fees.
 const FEE_PERCENT = Number(process.env.PLATFORM_FEE_PERCENT ?? 0);
 
-export const paymentsConfigured = () => !!(process.env.STRIPE_SECRET_KEY && WEBHOOK_SECRET && SUPABASE_URL && SERVICE_KEY);
-
-const admin = () => createClient(SUPABASE_URL!, SERVICE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
-
-/** The signed-in app user, from the Supabase access token the app sends. */
-async function caller(req: IncomingMessage): Promise<string | null> {
-  const token = req.headers.authorization?.replace(/^Bearer /, '');
-  if (!token) return null;
-  const { data } = await admin().auth.getUser(token);
-  return data.user?.id ?? null;
-}
+export const paymentsConfigured = () => !!(process.env.STRIPE_SECRET_KEY && WEBHOOK_SECRET && databaseConfigured());
 
 /** A plain page to land on after Stripe, telling the user to go back to the app. */
 function page(res: ServerResponse, message: string) {

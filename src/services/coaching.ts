@@ -4,6 +4,7 @@ import { loadRecord, saveRecord } from '../lib/db';
 import type { FeedPost, Profile } from '../lib/social';
 import { fail, loadFeed, myId, SocialError, toProfile, type ProfileRow } from './social';
 import { supabase } from './supabase';
+import { notifyOther, registerPush } from './push';
 import { cancelSubscription, toSubscription, type CoachingPaidRow } from './payments';
 import type { Subscription } from '../lib/payments';
 
@@ -32,6 +33,7 @@ const toAssignment = (r: AssignmentRow): Assignment => ({
 export async function myCoachCode(): Promise<string> {
   const { data, error } = await supabase.rpc('coach_code');
   fail(error);
+  await registerPush({ ask: true });
   return data as string;
 }
 
@@ -48,6 +50,8 @@ export async function joinCoach(code: string): Promise<void> {
   if (error?.code === '22023') throw new SocialError('That’s your own code. Share it with your clients.');
   if (error?.code === '23505') throw new SocialError('You already have a coach. Leave them first to join someone else.');
   fail(error);
+  // Now there's someone to hear from: ask once for alerts.
+  await registerPush({ ask: true });
 }
 
 /** Who coaches you, and who you coach, with each pair's subscription. */
@@ -92,10 +96,13 @@ export async function loadAssignments(client?: string): Promise<Assignment[]> {
 
 export async function assignWorkout(a: { client: string; title: string; note: string; plan: PlanItem[]; scheduledFor: string }): Promise<void> {
   const coach = await myId();
-  fail(
-    (await supabase.from('assignments').insert({ coach, client: a.client, title: a.title.trim(), note: a.note.trim(), plan: a.plan, scheduled_for: a.scheduledFor })).error,
-    'Couldn’t send the workout. Try again.',
-  );
+  const { data, error } = await supabase
+    .from('assignments')
+    .insert({ coach, client: a.client, title: a.title.trim(), note: a.note.trim(), plan: a.plan, scheduled_for: a.scheduledFor })
+    .select('id')
+    .single();
+  fail(error, 'Couldn’t send the workout. Try again.');
+  if (data) notifyOther('assignment', data.id);
 }
 
 export async function removeAssignment(id: number): Promise<void> {
@@ -127,7 +134,9 @@ export async function loadMessages(coach: string, client: string): Promise<Messa
 }
 
 export async function sendMessage(coach: string, client: string, text: string): Promise<void> {
-  fail((await supabase.from('messages').insert({ coach, client, text: text.trim() })).error, 'Couldn’t send. Try again.');
+  const { data, error } = await supabase.from('messages').insert({ coach, client, text: text.trim() }).select('id').single();
+  fail(error, 'Couldn’t send. Try again.');
+  if (data) notifyOther('message', data.id);
 }
 
 // Ticking off an assignment. The workout started from it is remembered on the phone, so finishing
@@ -157,6 +166,7 @@ export async function flushAssignmentsDone(db: SQLiteDatabase): Promise<void> {
   for (const d of done) {
     const { error } = await supabase.from('assignments').update({ completed_at: d.at }).eq('id', d.id);
     if (error) left.push(d);
+    else notifyOther('done', d.id);
   }
   await saveRecord(db, DONE_QUEUE, left.length ? left : null);
 }

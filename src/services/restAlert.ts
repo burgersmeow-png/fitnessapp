@@ -1,15 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-// While the app is open the in-app timer and haptics cover it, so stay quiet.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: false,
-    shouldShowList: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
 
 let scheduledId: string | null = null;
 let permission: boolean | null = null;
