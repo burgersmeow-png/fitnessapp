@@ -74,6 +74,12 @@
     .browser { display: block; margin-top: 12px; color: var(--text); font-weight: 700; text-align: center; text-underline-offset: 3px; }
     .beat { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 90, 31, 0.12); }
     .beat b { font-size: 24px; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .pins { margin-top: 28px; }
+    .pins ul { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 10px; }
+    .pins a { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text); text-decoration: none; }
+    .pins .kind { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .pins .title { display: block; font-weight: 800; font-size: 18px; overflow-wrap: anywhere; }
+    .pins .go { margin-left: auto; color: var(--text-muted); font-size: 22px; }
     .open { display: flex; width: 100%; margin-top: 16px; background: var(--accent); color: var(--accent-text); font-size: 18px; }
     .error { color: #f5b53d; }
     [hidden] { display: none !important; }
@@ -115,6 +121,11 @@
       <a class="button open" id="open-challenge" href="#">Join in LiftLab</a>
       <a class="browser" id="open-challenge-web" href="#" hidden>No iPhone? Try it in your browser</a>
       <p class="code-note">New to LiftLab? Install it, then come back and tap this button.</p>
+    </section>
+
+    <section class="pins" id="pins" hidden aria-labelledby="pins-title">
+      <div class="code-label" id="pins-title">Pinned</div>
+      <ul id="pin-list"></ul>
     </section>
 
     <section class="code-card" id="code-card" hidden aria-labelledby="code-label">
@@ -315,6 +326,34 @@
             document.title = name + ' invited you to LiftLab';
             $('eyebrow').textContent = name + ' invited you';
             $('headline').textContent = 'Train with ' + name + ' on LiftLab';
+          }
+          var pins = (r.body.pins || []).filter(function (p) { return /^[wpc]$/.test(p.kind) && /^[A-Za-z0-9_-]+$/.test(p.payload); });
+          if (pins.length && !(workout || challenge || plan)) {
+            var kinds = { w: 'Workout', p: 'Plan', c: 'Challenge' };
+            $('pins-title').textContent = 'From ' + name;
+            pins.forEach(function (p) {
+              var li = document.createElement('li');
+              var a = document.createElement('a');
+              a.href = '?' + p.kind + '=' + p.payload + '&code=' + code;
+              var text = document.createElement('span');
+              var kind = document.createElement('span');
+              kind.className = 'kind';
+              kind.textContent = kinds[p.kind];
+              var title = document.createElement('span');
+              title.className = 'title';
+              title.textContent = p.title;
+              text.appendChild(kind);
+              text.appendChild(title);
+              var go = document.createElement('span');
+              go.className = 'go';
+              go.setAttribute('aria-hidden', 'true');
+              go.textContent = '›';
+              a.appendChild(text);
+              a.appendChild(go);
+              li.appendChild(a);
+              $('pin-list').appendChild(li);
+            });
+            $('pins').hidden = false;
           }
           if (r.body.welcome) {
             $('welcome').textContent = '“' + r.body.welcome + '”';

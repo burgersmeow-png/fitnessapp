@@ -1,4 +1,5 @@
 // What goes on the story-sized share card after a workout. Pure.
+import type { WorkoutLink } from './workoutLink';
 
 export interface CardInput {
   startedAt: string;
@@ -154,5 +155,23 @@ export function streakCardContent(s: StreakCardInput, locale?: string): CardCont
     ],
     more: 0,
     footer: 'Planned and tracked with LiftLab',
+  };
+}
+
+/** A shared workout as a story card, for creators who post the link in their bio. */
+export function workoutCardContent(w: WorkoutLink): CardContent {
+  const sets = w.lifts.reduce((n, l) => n + l.sets, 0);
+  const stats = [
+    { value: String(w.lifts.length), label: w.lifts.length === 1 ? 'LIFT' : 'LIFTS' },
+    { value: String(sets), label: sets === 1 ? 'SET' : 'SETS' },
+    w.beat ? { value: compactNumber(w.beat.volume), label: `${w.beat.units.toUpperCase()} TO BEAT` } : null,
+  ].filter((s): s is { value: string; label: string } => s != null);
+  return {
+    eyebrow: w.beat ? 'CAN YOU BEAT MY WORKOUT?' : 'TRY MY WORKOUT',
+    headline: (w.title.trim() || 'My workout').toUpperCase(),
+    stats,
+    lines: w.lifts.slice(0, MAX_LINES).map((l) => ({ name: l.name, detail: `${l.sets} × ${l.reps}`, pr: false })),
+    more: Math.max(0, w.lifts.length - MAX_LINES),
+    footer: 'Link in bio · it opens right in LiftLab',
   };
 }

@@ -48,6 +48,9 @@
     .row { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
     .link { flex: 1; min-width: 0; background: var(--surface-raised); border-radius: 12px; padding: 12px; font-size: 14px; overflow-wrap: anywhere; }
     button { font: inherit; font-weight: 800; border: 0; border-radius: 12px; min-height: 44px; padding: 0 16px; background: var(--surface-raised); color: var(--text); cursor: pointer; flex-shrink: 0; }
+    textarea { width: 100%; margin-top: 12px; background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 12px; font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+    button.primary { background: var(--accent); color: #fff; }
+    #view-page { margin: 0; color: var(--text); font-weight: 700; }
     ul { margin: 12px 0 0; padding-left: 20px; color: var(--text-muted); font-size: 15px; }
     li { margin-top: 6px; }
     li b { color: var(--text); }
@@ -78,12 +81,20 @@
         <table class="sr" id="table"><thead><tr><th>Day</th><th>Sign-ups</th></tr></thead><tbody></tbody></table>
       </section>
 
+      <section aria-labelledby="pins-title">
+        <h2 id="pins-title">Your page</h2>
+        <p class="note">Followers who open your link see these, in this order. Paste up to 6 workout, plan or challenge links from the app, one per line.</p>
+        <label class="sr" for="pins">Pinned links, one per line</label>
+        <textarea id="pins" rows="6" spellcheck="false" placeholder="https://…/?w=…"></textarea>
+        <div class="row"><button type="button" id="save-pins" class="primary">Save my page</button><a class="note" id="view-page" target="_blank" rel="noopener">See it</a></div>
+        <p class="note" id="pins-status" role="status"></p>
+      </section>
       <section aria-labelledby="links-title">
         <h2 id="links-title">Your link</h2>
         <div class="row"><div class="link" id="link"></div><button type="button" id="copy">Copy</button></div>
         <ul>
           <li>Put it in your bio. Followers who open it see your code ready to copy.</li>
-          <li>In the app, <b>Share link</b> on any workout or <b>Invite people</b> on a challenge, then add <b id="suffix"></b> to the end so you get the credit.</li>
+          <li>In the app, open <b>Settings</b> and add your code under <b>Are you a creator?</b>. Every workout, plan and challenge link you share then gives you the credit.</li>
           <li>Someone counts as <b>active</b> once they finish their first workout.</li>
         </ul>
       </section>
@@ -126,11 +137,27 @@
         var site = location.href.replace(/creator\.html.*$/, '');
         var link = site + '?code=' + d.code;
         $('link').textContent = link;
-        $('suffix').textContent = '&code=' + d.code;
         $('copy').addEventListener('click', function () {
           if (navigator.clipboard) navigator.clipboard.writeText(link).then(function () { $('copy').textContent = 'Copied'; });
         });
 
+        var api = cfg.serverUrl.replace(/\/$/, '');
+        var pinUrl = function (p) { return site + '?' + p.kind + '=' + p.payload; };
+        $('pins').value = (d.pins || []).map(pinUrl).join('\n');
+        $('view-page').href = link;
+        $('save-pins').addEventListener('click', function () {
+          var status = $('pins-status');
+          status.className = 'note';
+          status.textContent = 'Saving…';
+          fetch(api + '/ref/pins', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, token: token, links: $('pins').value.split('\n') }) })
+            .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+            .then(function (r) {
+              if (!r.ok) { status.className = 'note error'; status.textContent = r.body.error || 'Couldn’t save. Try again.'; return; }
+              $('pins').value = r.body.pins.map(pinUrl).join('\n');
+              status.textContent = r.body.pins.length ? 'Saved. Your page shows ' + r.body.pins.length + (r.body.pins.length === 1 ? ' link.' : ' links.') : 'Saved. Your page shows no pinned links.';
+            })
+            .catch(function () { status.className = 'note error'; status.textContent = 'Couldn’t reach LiftLab. Try again.'; });
+        });
         var max = Math.max.apply(null, d.daily.map(function (x) { return x.count; }).concat([1]));
         var chart = $('chart');
         var tip = document.createElement('div');
