@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { timeStat, recapContent, recapMonth, recapWeek, weekLabel, weekRecapContent, type RecapInput } from './recap';
+import { timeStat, recapContent, recapMonth, recapNudge, recapWeek, weekLabel, weekRecapContent, type RecapInput } from './recap';
 
 const at = (d: number, h = 7) => new Date(2026, 9, d, h).toISOString();
 const base: RecapInput = {
@@ -84,4 +84,14 @@ test('on an empty Monday the recap is still last week', () => {
   assert.equal(recapWeek(new Date(2026, 9, 26, 9), lastWeek).getDate(), 19);
   assert.equal(recapWeek(new Date(2026, 9, 26, 9), [...lastWeek, new Date(2026, 9, 26, 7).toISOString()]).getDate(), 26);
   assert.equal(recapWeek(new Date(2026, 9, 27, 9), lastWeek).getDate(), 26);
+});
+
+test('the recap reminder is Sunday 7pm, only for a week with training', () => {
+  const tue = new Date(2026, 9, 20, 7).toISOString();
+  const n = recapNudge(new Date(2026, 9, 21, 12), [tue, new Date(2026, 9, 14).toISOString()])!;
+  assert.equal(n.at.getTime(), new Date(2026, 9, 25, 19).getTime());
+  assert.equal(n.body, 'You trained once this week. Your recap card is ready to share.');
+  assert.match(recapNudge(new Date(2026, 9, 21), [tue, tue, tue])!.body, /3 times/);
+  assert.equal(recapNudge(new Date(2026, 9, 21), [new Date(2026, 9, 14).toISOString()]), null);
+  assert.equal(recapNudge(new Date(2026, 9, 25, 20), [tue]), null);
 });
