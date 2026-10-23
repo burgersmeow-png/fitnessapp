@@ -5,7 +5,8 @@ import { StravaCard } from '../../components/StravaCard';
 import { allowReminders, remindersSupported, syncReminders } from '../../services/reminders';
 import { stravaEnabled } from '../../services/strava';
 import { socialConfigured } from '../../services/supabase';
-import { Chip, SectionLabel, Loading } from '../../components/ui';
+import { Button, Chip, SectionLabel, Loading } from '../../components/ui';
+import { exportTrainingLog } from '../../services/exportLog';
 import { fromKg, loadSettings, saveSettings, toKg } from '../../lib/db';
 import { formatTime } from '../../lib/habits';
 import { dailyTargets } from '../../lib/nutrition';
@@ -42,6 +43,7 @@ export default function SettingsScreen() {
   const [settings, reload] = useFocusData(() => loadSettings(db));
   const [weightText, setWeightText] = useState('');
   const [notifyBlocked, setNotifyBlocked] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
   useEffect(() => {
     if (settings) setWeightText(settings.bodyWeightKg ? String(Math.round(fromKg(settings.bodyWeightKg))) : '');
   }, [settings]);
@@ -174,6 +176,18 @@ export default function SettingsScreen() {
         </>
       )}
       <Text style={[styles.note, { marginTop: space.md }]}>Today's plan updates as soon as you change these.</Text>
+      <SectionLabel>Your data</SectionLabel>
+      <Button
+        title="Export training log (CSV)"
+        variant="secondary"
+        onPress={async () => {
+          const n = await exportTrainingLog(db);
+          setExported(n === 0 ? 'Nothing to export yet. Finish a workout first.' : `Exported ${n} ${n === 1 ? 'set' : 'sets'}.`);
+        }}
+      />
+      <Text style={[styles.note, { marginTop: space.sm }]}>
+        {exported ?? 'Every set you’ve logged, as a file that opens in Excel, Numbers or Google Sheets.'}
+      </Text>
     </ScrollView>
   );
 }

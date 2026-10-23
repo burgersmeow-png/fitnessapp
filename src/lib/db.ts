@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { CardioSession, CardioType } from './cardio';
 import { EXERCISES } from './exercises';
 import type { FoodEntry, FoodItem, Meal } from './nutrition';
+import type { ExportRow } from './exportCsv';
 import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
@@ -347,6 +348,21 @@ export async function deleteWorkout(db: SQLiteDatabase, id: number): Promise<voi
   await db.withTransactionAsync(async () => {
     await db.runAsync('DELETE FROM sets WHERE workout_id = ?', id);
     await db.runAsync('DELETE FROM workouts WHERE id = ?', id);
+  });
+}
+
+/** Every logged set, oldest first, with set numbers within each workout, for export. */
+export async function loadExportRows(db: SQLiteDatabase): Promise<ExportRow[]> {
+  const rows = await db.getAllAsync<{ workout_id: number; name: string; exercise_id: string; weight: number | null; reps: number | null; rir: number | null; completed_at: string }>(
+    `SELECT s.workout_id, e.name, s.exercise_id, s.weight, s.reps, s.rir, s.completed_at
+     FROM sets s JOIN exercises e ON e.id = s.exercise_id
+     WHERE s.completed_at IS NOT NULL ORDER BY s.workout_id, s.position`,
+  );
+  const counts = new Map<string, number>();
+  return rows.map((r) => {
+    const key = `${r.workout_id}:${r.exercise_id}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    return { date: r.completed_at, exercise: r.name, set: counts.get(key)!, weight: fromKgOrNull(r.weight), reps: r.reps, rir: r.rir };
   });
 }
 
