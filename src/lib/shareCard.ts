@@ -1,5 +1,6 @@
 // What goes on the story-sized share card after a workout. Pure.
 import type { WorkoutLink } from './workoutLink';
+import type { PlanLink } from './planLink';
 
 export interface CardInput {
   startedAt: string;
@@ -172,6 +173,28 @@ export function workoutCardContent(w: WorkoutLink): CardContent {
     stats,
     lines: w.lifts.slice(0, MAX_LINES).map((l) => ({ name: l.name, detail: `${l.sets} × ${l.reps}`, pr: false })),
     more: Math.max(0, w.lifts.length - MAX_LINES),
+    footer: 'Link in bio · it opens right in LiftLab',
+  };
+}
+
+/** A plan as a story card: its days in order. */
+export function planCardContent(p: PlanLink): CardContent {
+  const lifts = new Set(p.days.flatMap((d) => d.lifts.map((l) => l.name.toLowerCase()))).size;
+  const sets = p.days.reduce((n, d) => n + d.lifts.reduce((m, l) => m + l.sets, 0), 0);
+  return {
+    eyebrow: 'FOLLOW MY PLAN',
+    headline: (p.title.trim() || 'My plan').toUpperCase(),
+    stats: [
+      { value: String(p.days.length), label: p.days.length === 1 ? 'DAY' : 'DAYS' },
+      { value: String(lifts), label: lifts === 1 ? 'LIFT' : 'LIFTS' },
+      { value: String(Math.round(sets / Math.max(1, p.days.length))), label: 'SETS / DAY' },
+    ],
+    lines: p.days.slice(0, MAX_LINES).map((d, i) => ({
+      name: `Day ${i + 1} · ${d.title}`,
+      detail: d.lifts.slice(0, 3).map((l) => l.name).join(', ') + (d.lifts.length > 3 ? ` +${d.lifts.length - 3}` : ''),
+      pr: false,
+    })),
+    more: Math.max(0, p.days.length - MAX_LINES),
     footer: 'Link in bio · it opens right in LiftLab',
   };
 }

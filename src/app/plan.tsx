@@ -13,6 +13,8 @@ import { linkWithMyCode } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
 import { useLinkCredit } from '../components/useLinkCredit';
 import { shareLink } from '../services/shareLink';
+import { ShareCardSheet } from '../components/ShareCardSheet';
+import { planCardContent, type CardContent } from '../lib/shareCard';
 
 /** A plan opened from a link (liftlab://plan?p=…), or the one you follow. */
 export default function PlanScreen() {
@@ -20,6 +22,7 @@ export default function PlanScreen() {
   const creator = useLinkCredit(code);
   const db = useSQLiteContext();
   const [status, setStatus] = useState<string | null>(null);
+  const [card, setCard] = useState<CardContent | null>(null);
   const [data, reload] = useFocusData(async () => {
     const [followed, program] = await Promise.all([loadPlan(db), loadProgram(db)]);
     return { followed, program, shared: decodePlan(p) };
@@ -79,7 +82,7 @@ export default function PlanScreen() {
       {following ? (
         <View style={styles.row}>
           <Button title="Share plan" variant="secondary" onPress={share} style={{ flex: 1 }} />
-          <Button title="Stop following" variant="secondary" onPress={stop} style={{ flex: 1 }} />
+          <Button title="Story image" variant="secondary" onPress={() => setCard(planCardContent(plan))} style={{ flex: 1 }} />
         </View>
       ) : (
         <Button title="Follow this plan" onPress={follow} style={{ marginTop: space.md }} />
@@ -107,6 +110,12 @@ export default function PlanScreen() {
           </Card>
         );
       })}
+      {following && (
+        <Pressable onPress={stop} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: space.lg }}>
+          <Text style={styles.notNow}>Stop following this plan</Text>
+        </Pressable>
+      )}
+      <ShareCardSheet content={card} onClose={() => setCard(null)} title="Post it to your story" fileName="liftlab-plan.png" />
       {!following && !router.canGoBack() && (
         <Pressable onPress={() => router.replace('/')} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: space.sm }}>
           <Text style={styles.notNow}>Not now</Text>
