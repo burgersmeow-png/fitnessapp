@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { badgeCardContent, cardContent, compactNumber, prCardContent, type CardInput } from './shareCard';
+import { badgeCardContent, cardContent, compactNumber, prCardContent, streakCardContent, type CardInput } from './shareCard';
 
 const base: CardInput = {
   startedAt: new Date(2026, 9, 23, 7).toISOString(),
@@ -62,4 +62,11 @@ test('a badge card names the badge and how it was earned', () => {
   assert.equal(c.eyebrow, 'BADGE UNLOCKED · OCT 23, 2026');
   assert.deepEqual(c.stats.map((s) => s.value), ['4/18', '10']);
   assert.equal(c.lines[0].detail, 'Finish 10 workouts');
+});
+
+test('a streak card leads with the run of weeks', () => {
+  const c = streakCardContent({ streak: 6, bestStreak: 4, done: 2, goal: 3, workouts: 21, now: new Date(2026, 9, 23) }, 'en-US');
+  assert.equal(c.headline, '6-WEEK STREAK');
+  assert.deepEqual(c.stats.map((s) => s.value), ['2/3', '6', '21']);
+  assert.equal(c.lines[0].detail, 'Hit 6 weeks in a row');
 });

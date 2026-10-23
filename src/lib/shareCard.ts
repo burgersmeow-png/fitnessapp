@@ -124,3 +124,35 @@ export function badgeCardContent(b: BadgeCardInput, locale?: string): CardConten
     footer: 'Planned and tracked with LiftLab',
   };
 }
+
+export interface StreakCardInput {
+  streak: number;
+  bestStreak: number;
+  done: number;
+  goal: number;
+  workouts: number;
+  now: Date;
+}
+
+/** The card for a run of weeks hitting the weekly goal. */
+export function streakCardContent(s: StreakCardInput, locale?: string): CardContent {
+  const day = s.now.toLocaleDateString(locale, { month: 'short', day: 'numeric' }).toUpperCase();
+  return {
+    eyebrow: `CONSISTENCY · ${day}`,
+    headline: `${s.streak}-WEEK STREAK`,
+    stats: [
+      { value: `${s.done}/${s.goal}`, label: 'THIS WEEK' },
+      { value: String(Math.max(s.bestStreak, s.streak)), label: 'BEST STREAK' },
+      { value: compactNumber(s.workouts), label: s.workouts === 1 ? 'WORKOUT' : 'WORKOUTS' },
+    ],
+    lines: [
+      {
+        name: `${s.goal} ${s.goal === 1 ? 'day' : 'days'} a week`,
+        detail: `Hit ${s.streak} ${s.streak === 1 ? 'week' : 'weeks in a row'}`,
+        pr: false,
+      },
+    ],
+    more: 0,
+    footer: 'Planned and tracked with LiftLab',
+  };
+}

@@ -8,7 +8,7 @@ import { Loading } from '../components/ui';
 import { loadSettings } from '../lib/db';
 import { formatDate } from '../lib/format';
 import { badgeHow, BADGES, goalLine, weekProgress } from '../lib/habits';
-import { badgeCardContent, type CardContent } from '../lib/shareCard';
+import { badgeCardContent, streakCardContent, type CardContent } from '../lib/shareCard';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habits';
@@ -16,6 +16,7 @@ import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habit
 export default function BadgesScreen() {
   const db = useSQLiteContext();
   const [card, setCard] = useState<CardContent | null>(null);
+  const [cardTitle, setCardTitle] = useState('Share your badge');
   const [data] = useFocusData(async () => {
     const settings = await loadSettings(db);
     const [state, dates] = await Promise.all([checkBadges(db, settings.weeklyGoal), loadSessionDates(db)]);
@@ -42,6 +43,20 @@ export default function BadgesScreen() {
               Best run: {stats.bestStreak} weeks at {settings.weeklyGoal} {settings.weeklyGoal === 1 ? 'day' : 'days'} a week.
             </Text>
           )}
+          {week.streak > 0 && (
+            <Pressable
+              onPress={() => {
+                setCardTitle('Share your streak');
+                setCard(streakCardContent({ streak: week.streak, bestStreak: stats.bestStreak, done: week.done, goal: week.goal, workouts: stats.workouts, now: new Date() }));
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              style={[styles.shareHint, { marginTop: space.sm }]}
+            >
+              <Icon name="share" size={15} color={colors.accent} />
+              <Text style={[styles.shareText, { fontSize: 14 }]}>Share streak</Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -55,8 +70,9 @@ export default function BadgesScreen() {
               key={b.id}
               style={({ pressed }) => [styles.badge, freshIds.has(b.id) && styles.fresh, pressed && got && { opacity: 0.8 }]}
               disabled={!got}
-              onPress={() =>
-                got &&
+              onPress={() => {
+                if (!got) return;
+                setCardTitle('Share your badge');
                 setCard(
                   badgeCardContent({
                     title: b.title,
@@ -67,8 +83,8 @@ export default function BadgesScreen() {
                     workouts: stats.workouts,
                     bestStreak: stats.bestStreak,
                   }),
-                )
-              }
+                );
+              }}
               accessibilityRole={got ? 'button' : undefined}
               accessibilityLabel={`${b.title}. ${got ? 'Earned. Share it' : `Locked. ${badgeHow(b, settings.units)}`}`}
             >
@@ -100,7 +116,7 @@ export default function BadgesScreen() {
           );
         })}
       </View>
-      <ShareCardSheet content={card} onClose={() => setCard(null)} title="Share your badge" fileName="liftlab-badge.png" />
+      <ShareCardSheet content={card} onClose={() => setCard(null)} title={cardTitle} fileName="liftlab-badge.png" />
     </ScrollView>
   );
 }
