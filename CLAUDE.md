@@ -14,10 +14,10 @@ Read `AGENTS.md` too (Expo-specific rules: versioned docs, `npx expo install`, E
 
 - `src/app/` screens only (each file is a route). `src/components/` shared UI. `src/lib/` logic and data.
 - Training logic in `src/lib/` is pure TypeScript with no React or Expo imports, and is unit tested
+  (`npm test`). Screens call it; it never calls screens.
 - Exercise demos are drawn in code, not filmed: `src/lib/figure.ts` (geometry) and `src/lib/motions.ts`
   (two key poses per exercise). Coaching cues live in `src/lib/exerciseGuide.ts`. Do not add
   third-party exercise photos or videos without a licence that allows commercial app use.
-  (`npm test`). Screens call it; it never calls screens.
 - One feature per screen file; extract a component when a screen passes ~300 lines.
 - No new dependencies unless the owner approves. Prefer Expo modules that run in Expo Go.
 
