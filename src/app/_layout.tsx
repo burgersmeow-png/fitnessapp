@@ -45,6 +45,10 @@ export default function RootLayout() {
           <Stack.Screen name="add-friends" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="post/[id]" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="exercises" options={{ title: 'Exercises', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="coaching/index" options={{ title: 'Coaching', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="coaching/client/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="coaching/assign" options={{ title: 'Assign workout', presentation: 'modal' }} />
+          <Stack.Screen name="coaching/chat" options={{ title: 'Messages', headerBackTitle: 'Back' }} />
         </Stack>
       </ThemeProvider>
     </SQLiteProvider>

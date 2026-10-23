@@ -44,6 +44,10 @@ const ICONS = {
   highFiveOff: { sf: 'hand.raised', ion: 'hand-left-outline' },
   comment: { sf: 'bubble.left', ion: 'chatbubble-outline' },
   send: { sf: 'arrow.up.circle.fill', ion: 'arrow-up-circle' },
+  coaching: { sf: 'figure.strengthtraining.traditional', ion: 'fitness' },
+  share: { sf: 'square.and.arrow.up', ion: 'share-outline' },
+  message: { sf: 'message.fill', ion: 'chatbubbles' },
+  calendar: { sf: 'calendar.badge.plus', ion: 'calendar-outline' },
 } as const satisfies Record<string, { sf: SFSymbol; ion: keyof typeof Ionicons.glyphMap }>;
 
 export type IconName = keyof typeof ICONS;

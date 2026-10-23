@@ -6,8 +6,9 @@ import { socialConfigured, supabase } from './supabase';
 export class SocialError extends Error {}
 
 const QUEUE = 'socialQueue';
+type QueuedPost = NewPost & { visibility?: 'friends' | 'coach' };
 
-function fail(error: { message: string; code?: string } | null, friendly?: string): void {
+export function fail(error: { message: string; code?: string } | null, friendly?: string): void {
   if (!error) return;
   if (error.message?.includes('Failed to fetch') || error.message?.includes('Network request failed')) {
     throw new SocialError('You’re offline. Try again when you have signal.');
@@ -15,10 +16,10 @@ function fail(error: { message: string; code?: string } | null, friendly?: strin
   throw new SocialError(friendly ?? 'Something went wrong. Try again.');
 }
 
-type ProfileRow = { id: string; username: string; display_name: string };
-const toProfile = (r: ProfileRow): Profile => ({ id: r.id, username: r.username, displayName: r.display_name });
+export type ProfileRow = { id: string; username: string; display_name: string };
+export const toProfile = (r: ProfileRow): Profile => ({ id: r.id, username: r.username, displayName: r.display_name });
 
-async function myId(): Promise<string> {
+export async function myId(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   if (!data.session) throw new SocialError('Sign in first.');
   return data.session.user.id;
@@ -197,23 +198,38 @@ export async function deletePost(postId: number): Promise<void> {
 
 // Sharing. Posts wait in a queue on the phone, so a workout finished with no signal is shared later.
 
-export async function sharePost(db: SQLiteDatabase, post: NewPost): Promise<void> {
+/** Queues a session for friends (or for your coach only, when `visibility` is 'coach'). */
+export async function sharePost(db: SQLiteDatabase, post: NewPost & { visibility?: 'friends' | 'coach' }): Promise<void> {
   if (!socialConfigured) return;
-  const queue = (await loadRecord<NewPost[]>(db, QUEUE)) ?? [];
+  const queue = (await loadRecord<QueuedPost[]>(db, QUEUE)) ?? [];
   await saveRecord(db, QUEUE, [...queue.filter((p) => p.clientId !== post.clientId), post]);
   await flushShareQueue(db);
 }
 
 /** Uploads waiting posts. Never throws; whatever fails stays queued. */
 export async function flushShareQueue(db: SQLiteDatabase): Promise<void> {
-  const queue = (await loadRecord<NewPost[]>(db, QUEUE)) ?? [];
+  const queue = (await loadRecord<QueuedPost[]>(db, QUEUE)) ?? [];
   if (!queue.length) return;
   const { data } = await supabase.auth.getSession();
   if (!data.session) return;
-  const left: NewPost[] = [];
+  const me = data.session.user.id;
+  // Coach-only sessions are uploaded only while there is a coach to see them.
+  const hasCoach = queue.some((p) => p.visibility === 'coach')
+    ? !!(await supabase.from('coaching').select('coach').eq('client', me).maybeSingle()).data
+    : false;
+  const left: QueuedPost[] = [];
   for (const p of queue) {
+    if (p.visibility === 'coach' && !hasCoach) continue;
     const { error } = await supabase.from('posts').upsert(
-      { user_id: data.session.user.id, client_id: p.clientId, kind: p.kind, title: p.title, body: p.body, happened_at: p.happenedAt },
+      {
+        user_id: me,
+        client_id: p.clientId,
+        kind: p.kind,
+        title: p.title,
+        body: p.body,
+        happened_at: p.happenedAt,
+        visibility: p.visibility ?? 'friends',
+      },
       { onConflict: 'user_id,client_id', ignoreDuplicates: true },
     );
     if (error) left.push(p);

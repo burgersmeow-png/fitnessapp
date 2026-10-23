@@ -77,3 +77,66 @@ test('privacy rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_AN
   await bob.c.rpc('delete_account');
   await eve.c.rpc('delete_account');
 });
+
+test('coaching rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_ANON_KEY' }, async () => {
+  const coach = await user('coach');
+  const client = await user('client');
+  const eve = await user('eve');
+  const today = new Date().toISOString().slice(0, 10);
+  const plan = [{ exerciseId: 'barbell-back-squat', sets: 3, reps: 5, weightKg: 100 }];
+
+  const { data: code, error } = await coach.c.rpc('coach_code');
+  assert.ifError(error);
+  assert.match(code, /^[A-Z0-9]{6}$/);
+  assert.equal((await coach.c.rpc('coach_code')).data, code, 'the code stays the same');
+  // Nobody else can read a coach's code.
+  assert.equal((await eve.c.from('coach_codes').select()).data.length, 0);
+
+  // Before joining, the coach can't assign, message or see private sessions.
+  assert.ok((await coach.c.from('assignments').insert({ client: client.id, title: 'Squat', plan, scheduled_for: today })).error);
+  const { data: priv } = await client.c
+    .from('posts')
+    .insert({ client_id: 'p1', kind: 'workout', title: 'Private', body: {}, happened_at: new Date().toISOString(), visibility: 'coach' })
+    .select()
+    .single();
+  assert.equal((await coach.c.from('posts').select().eq('id', priv.id)).data.length, 0);
+
+  assert.equal((await client.c.rpc('join_coach', { invite: 'NOPE00' })).error?.code, 'P0002');
+  assert.equal((await coach.c.rpc('join_coach', { invite: code })).error?.code, '22023');
+  assert.equal((await client.c.rpc('join_coach', { invite: ` ${code.toLowerCase()} ` })).data, coach.id);
+
+  // Now the coach sees the client's coach-only session; friends-only strangers still don't.
+  assert.equal((await coach.c.from('posts').select().eq('id', priv.id)).data.length, 1);
+  assert.equal((await eve.c.from('posts').select().eq('id', priv.id)).data.length, 0);
+
+  const { data: a, error: ae } = await coach.c.from('assignments').insert({ client: client.id, title: 'Squat day', plan, scheduled_for: today }).select().single();
+  assert.ifError(ae);
+  assert.equal((await client.c.from('assignments').select()).data.length, 1);
+  assert.equal((await eve.c.from('assignments').select()).data.length, 0);
+  // The client ticks it off but can't rewrite it.
+  assert.ifError((await client.c.from('assignments').update({ completed_at: new Date().toISOString() }).eq('id', a.id)).error);
+  assert.ok((await client.c.from('assignments').update({ title: 'Rest day' }).eq('id', a.id)).error);
+  // Eve can't assign to someone else's client, or join as a coach of them.
+  assert.ok((await eve.c.from('assignments').insert({ client: client.id, title: 'x', plan, scheduled_for: today })).error);
+  assert.ok((await eve.c.from('coaching').insert({ coach: eve.id, client: client.id })).error);
+
+  assert.ifError((await client.c.from('messages').insert({ coach: coach.id, client: client.id, text: 'Knee feels sore' })).error);
+  assert.ifError((await coach.c.from('messages').insert({ coach: coach.id, client: client.id, text: 'Swap squats for leg press' })).error);
+  assert.equal((await coach.c.from('messages').select()).data.length, 2);
+  assert.equal((await eve.c.from('messages').select()).data.length, 0);
+  assert.ok((await eve.c.from('messages').insert({ coach: coach.id, client: client.id, sender: eve.id, text: 'hi' })).error);
+  assert.ok((await client.c.from('messages').insert({ coach: coach.id, client: client.id, sender: coach.id, text: 'fake' })).error);
+
+  // A client has one coach at a time.
+  const other = await user('coach2');
+  const code2 = (await other.c.rpc('coach_code')).data;
+  assert.equal((await client.c.rpc('join_coach', { invite: code2 })).error?.code, '23505');
+
+  // Leaving ends access both ways.
+  assert.ifError((await client.c.from('coaching').delete().eq('client', client.id)).error);
+  assert.equal((await coach.c.from('posts').select().eq('id', priv.id)).data.length, 0);
+  assert.equal((await coach.c.from('messages').select()).data.length, 0);
+  assert.equal((await client.c.from('assignments').select()).data.length, 0);
+
+  for (const u of [coach, client, eve, other]) await u.c.rpc('delete_account');
+});

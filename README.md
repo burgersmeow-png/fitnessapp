@@ -23,6 +23,10 @@ Working name; rename any time in `app.json`.
 - **Friends**: add friends by username, see their workouts and runs in a feed, give high-fives and
   comment, and compare the week on a leaderboard ranked by sessions, so consistency wins. Finished
   sessions are shared automatically (switch it off in Settings), and only accepted friends see them
+- **Coaching** (Friends → coaching button): personal trainers turn on coach mode and share a code.
+  Clients join with it and can leave any time. Coaches get a dashboard of every client (last session,
+  sessions this week, plan completion, who needs a check-in), plan workouts for a chosen day, and
+  message clients. The client sees the coach's workout on Today, and finishing it ticks it off
 - **History**: workouts and cardio, weekly streak, volume
 - **Exercises** (from History): 66 exercises with body-map thumbnails, searchable and filtered by muscle, with a strength trend
 - **Exercises** also have an animated, drawn demo and step-by-step cues
@@ -85,8 +89,9 @@ on the phone; only a summary of each finished session is shared. To set it up (a
 
 1. Sign up at [supabase.com](https://supabase.com) and create a **New project** on the free plan. Pick
    the region closest to you and save the database password somewhere safe.
-2. Open **SQL Editor**, start a new query, paste everything from
-   `supabase/migrations/20261023000000_social.sql`, and press **Run**.
+2. Open **SQL Editor**. For each file in `supabase/migrations/`, oldest first, start a new query, paste
+   the whole file, and press **Run**. Today that's `20261023000000_social.sql` then
+   `20261023010000_coaching.sql`.
 3. Under **Authentication → Sign In / Providers → Email**, turn off **Confirm email** while you test. The
    free plan only sends a few emails an hour.
 4. Open **Connect** (or **Project Settings → API**) and copy the **Project URL** and the **anon** (or
@@ -142,6 +147,7 @@ Code layout:
 - `src/lib/voice.ts` understands spoken coach commands (offline)
 - `src/lib/nutrition.ts` calorie and macro targets, totals, photo-estimate checks, common foods
 - `server/` the helper server: meal photo estimates (Claude, prompt in `src/lib/foodPrompt.ts`) and Strava sign-in
+- `src/lib/coaching.ts` client summaries and coach plans; `src/services/coaching.ts` codes, plans, messages
 - `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
 - `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
 - `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting
@@ -153,5 +159,5 @@ Code layout:
 ## Next
 
 See the plan doc for the full roadmap: Apple Health and Watch, programs, barcode scanning,
-Garmin, always-on voice listening and trainer mode. HealthKit and the Watch
+Garmin, always-on voice listening, and trainer payments and push notifications. HealthKit and the Watch
 app need a development build through EAS and a paid Apple Developer account.

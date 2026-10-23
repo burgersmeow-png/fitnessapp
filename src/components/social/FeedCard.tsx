@@ -16,7 +16,7 @@ export function FeedCard({ post, me, onHighFive, detail }: { post: FeedPost; me:
   const b = post.body;
   const stats =
     'volumeKg' in b
-      ? [`${b.minutes} min`, `${b.sets} sets`, ...(b.volumeKg > 0 ? [`${formatNumber(fromKg(b.volumeKg))} ${units.weight} lifted`] : [])]
+      ? [`${b.minutes} min`, `${b.sets} ${b.sets === 1 ? 'set' : 'sets'}`, ...(b.volumeKg > 0 ? [`${formatNumber(fromKg(b.volumeKg))} ${units.weight} lifted`] : [])]
       : [`${b.minutes} min`, ...(b.distanceKm != null ? [`${fromKm(b.distanceKm)} ${units.distance}`] : [])];
   const icon = 'cardioType' in b ? (CARDIO_BY_TYPE.get(b.cardioType)?.icon ?? 'pulse') : 'exercises';
 

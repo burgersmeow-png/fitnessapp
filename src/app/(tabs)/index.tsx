@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap';
+import { CoachPlanCard } from '../../components/CoachPlanCard';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { Icon, type IconName } from '../../components/Icon';
 import { SectionLabel, Loading } from '../../components/ui';
@@ -85,6 +86,8 @@ export default function TodayScreen() {
         {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}
       </Text>
       <Text style={[type.hero, { marginBottom: space.md }]}>Today</Text>
+
+      <CoachPlanCard activeId={activeId} />
 
       <LinearGradient colors={['#FF6A2B', '#E5341B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={{ flexDirection: 'row' }}>

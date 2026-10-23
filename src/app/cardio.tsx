@@ -38,11 +38,13 @@ export default function CardioScreen() {
     const startedAt = new Date(Date.now() - minutes * 6e4).toISOString();
     const dist = selected.hasDistance && distance.trim() !== '' && !Number.isNaN(Number(distance)) ? Number(distance) : null;
     await saveCardio(db, { type: kind, startedAt, minutes, distance: dist, rpe });
-    if (settings?.shareWithFriends) {
+    // With friend sharing off, sessions still reach a coach if there is one.
+    if (settings) {
       const km = toKm(dist);
       sharePost(db, {
         clientId: `cardio:${startedAt}`,
         kind: 'cardio',
+        visibility: settings?.shareWithFriends === false ? 'coach' : 'friends',
         title: cardioTitle(startedAt, selected.label),
         happenedAt: startedAt,
         body: { cardioType: kind, minutes, distanceKm: km == null ? null : Math.round(km * 100) / 100 },

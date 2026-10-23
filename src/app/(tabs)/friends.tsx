@@ -103,14 +103,19 @@ function Feed({ me }: { me: Profile }) {
         <>
           <View style={styles.header}>
             <Text style={type.hero}>Friends</Text>
-            <Pressable onPress={() => router.push('/add-friends')} accessibilityRole="button" accessibilityLabel={`Add friends${data.requests ? `, ${data.requests} requests` : ''}`} style={styles.addButton}>
-              <Icon name="addFriend" size={22} color={colors.text} />
-              {data.requests > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{data.requests}</Text>
-                </View>
-              )}
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Pressable onPress={() => router.push('/coaching')} accessibilityRole="button" accessibilityLabel="Coaching" style={styles.addButton}>
+                <Icon name="coaching" size={22} color={colors.text} />
+              </Pressable>
+              <Pressable onPress={() => router.push('/add-friends')} accessibilityRole="button" accessibilityLabel={`Add friends${data.requests ? `, ${data.requests} requests` : ''}`} style={styles.addButton}>
+                <Icon name="addFriend" size={22} color={colors.text} />
+                {data.requests > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{data.requests}</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
           </View>
           {data.requests > 0 && (
             <Pressable onPress={() => router.push('/add-friends')} accessibilityRole="button" style={styles.requests}>

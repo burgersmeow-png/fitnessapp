@@ -31,6 +31,7 @@ import { CoachBar } from '../components/CoachBar';
 import { StravaShare } from '../components/StravaShare';
 import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
+import { finishAssignedWorkout } from '../services/coaching';
 import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
 
@@ -285,6 +286,7 @@ export default function WorkoutScreen() {
       const finished = sets.filter((s) => s.completedAt);
       const prNames = [...new Set(finished.filter((s) => prSets.has(s.id)).map((s) => exercises.get(s.exerciseId)?.name ?? ''))];
       await finishWorkout(db, workoutId!);
+      if (finished.length > 0) finishAssignedWorkout(db, workoutId!).catch(() => {});
       skipRest();
       if (finished.length === 0) {
         close();
@@ -312,7 +314,8 @@ export default function WorkoutScreen() {
           }),
         },
       });
-      if (settings?.shareWithFriends) {
+      // With friend sharing off, sessions still reach a coach if there is one.
+      if (settings) {
         const started = new Date(startedAt.current).toISOString();
         // Ordered by sets, so the title names what was trained most.
         const muscles = [...byExercise]
@@ -321,6 +324,7 @@ export default function WorkoutScreen() {
         sharePost(db, {
           clientId: `workout:${workoutId}`,
           kind: 'workout',
+          visibility: settings?.shareWithFriends === false ? 'coach' : 'friends',
           title: workoutTitle(started, muscles),
           happenedAt: started,
           body: {

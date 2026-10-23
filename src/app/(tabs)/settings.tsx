@@ -104,7 +104,7 @@ export default function SettingsScreen() {
             <Chip label="Share my sessions" selected={settings.shareWithFriends} onPress={() => update({ shareWithFriends: true })} />
             <Chip label="Keep private" selected={!settings.shareWithFriends} onPress={() => update({ shareWithFriends: false })} />
           </View>
-          <Text style={styles.note}>When you’re signed in, a summary of each finished workout or cardio session goes to friends you’ve accepted.</Text>
+          <Text style={styles.note}>When you’re signed in, a summary of each finished workout or cardio session goes to friends you’ve accepted. Kept private, it goes only to your coach, if you have one.</Text>
         </>
       )}
       {stravaEnabled && (
