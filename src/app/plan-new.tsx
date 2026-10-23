@@ -13,6 +13,8 @@ import { linkFromSets, TITLE_MAX } from '../lib/workoutLink';
 import { linkWithMyCode } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
 import { shareLink } from '../services/shareLink';
+import { ShareCardSheet } from '../components/ShareCardSheet';
+import { planCardContent, type CardContent } from '../lib/shareCard';
 
 type Day = { workoutId: number; title: string; summary: string };
 
@@ -22,6 +24,7 @@ export default function NewPlanScreen() {
   const [title, setTitle] = useState('');
   const [days, setDays] = useState<Day[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [card, setCard] = useState<CardContent | null>(null);
   const [workouts] = useFocusData(async () => (await loadWorkouts(db)).slice(0, 30));
   if (!workouts) return <Loading />;
 
@@ -96,6 +99,10 @@ export default function NewPlanScreen() {
           <Button title="Share plan" onPress={share} style={{ flex: 1 }} />
         </View>
       )}
+      {days.length > 0 && (
+        <Button title="Story image" variant="secondary" onPress={async () => setCard(planCardContent(await build()))} style={{ marginTop: space.sm }} />
+      )}
+      <ShareCardSheet content={card} onClose={() => setCard(null)} title="Post it to your story" fileName="liftlab-plan.png" />
 
       <SectionLabel>Your workouts</SectionLabel>
       {workouts.length === 0 && <Text style={styles.sub}>Finish a workout first, then it can go in a plan.</Text>}

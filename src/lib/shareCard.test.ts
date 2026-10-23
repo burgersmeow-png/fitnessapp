@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { badgeCardContent, cardContent, compactNumber, prCardContent, streakCardContent, workoutCardContent, type CardInput } from './shareCard';
+import { badgeCardContent, cardContent, compactNumber, prCardContent, planCardContent, streakCardContent, workoutCardContent, type CardInput } from './shareCard';
 
 const base: CardInput = {
   startedAt: new Date(2026, 9, 23, 7).toISOString(),
@@ -84,4 +84,18 @@ test('a shared workout card lists the lifts and the score to beat', () => {
   assert.equal(plain.eyebrow, 'TRY MY WORKOUT');
   assert.equal(plain.headline, 'MY WORKOUT');
   assert.deepEqual(plain.stats.map((s) => s.label), ['LIFT', 'SETS']);
+});
+
+test('a plan card lists its days in order', () => {
+  const lift = (name: string) => ({ id: name.toLowerCase(), name, sets: 3, reps: 8, rest: 90 });
+  const c = planCardContent({
+    title: '4-day split',
+    days: [
+      { title: 'Upper A', lifts: ['Bench', 'Row', 'Press', 'Curl'].map(lift) },
+      { title: 'Lower A', lifts: ['Squat', 'RDL'].map(lift) },
+    ],
+  });
+  assert.equal(c.headline, '4-DAY SPLIT');
+  assert.deepEqual(c.stats.map((s) => s.value), ['2', '6', '9']);
+  assert.deepEqual(c.lines[0], { name: 'Day 1 · Upper A', detail: 'Bench, Row, Press +1', pr: false });
 });
