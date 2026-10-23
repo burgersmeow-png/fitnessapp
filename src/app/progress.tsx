@@ -6,7 +6,9 @@ import { Icon } from '../components/Icon';
 import { LineChart } from '../components/LineChart';
 import { Measurements } from '../components/Measurements';
 import { Button, Card, Loading, SectionLabel } from '../components/ui';
-import { deleteBodyWeight, loadBodyWeights, loadExercises, loadHistory, loadMeasurements, loadSettings, logBodyWeight } from '../lib/db';
+import { deleteBodyWeight, loadBodyWeights, loadExercises, loadHistory, loadMeasurements, loadProgressPhotos, loadSettings, logBodyWeight } from '../lib/db';
+import { beforeAfter, photoCardContent } from '../lib/progressPhotos';
+import { ProgressPhotos } from '../components/ProgressPhotos';
 import { formatNumber, MUSCLE_LABELS } from '../lib/format';
 import { liftTrends, setsPerMuscle, trainingDaysPerWeek, trend, trendChange, WEEKLY_SETS, weightNote } from '../lib/progress';
 import { colors, radius, space, type } from '../lib/theme';
@@ -23,7 +25,7 @@ export default function ProgressScreen() {
   const [pickedWeek, setPickedWeek] = useState<number | null>(null);
   const [card, setCard] = useState<CardContent | null>(null);
   const [data, reload] = useFocusData(async () => {
-    const [weights, history, exercises, settings, dates, measurements, allTime] = await Promise.all([
+    const [weights, history, exercises, settings, dates, measurements, allTime, photos, allWeights] = await Promise.all([
       loadBodyWeights(db, 120),
       loadHistory(db, 84),
       loadExercises(db),
@@ -31,11 +33,16 @@ export default function ProgressScreen() {
       loadSessionDates(db),
       loadMeasurements(db),
       loadHistory(db),
+      loadProgressPhotos(db),
+      loadBodyWeights(db),
     ]);
     const liftDays = [...new Set(allTime.map((s) => s.completedAt.slice(0, 10)))];
     return {
       weights,
       measurements,
+      photos,
+      allWeights,
+      dates,
       settings,
       names: new Map(exercises.map((e) => [e.id, e.name])),
       lifts: liftTrends(history),
@@ -45,7 +52,15 @@ export default function ProgressScreen() {
     };
   });
   if (!data) return <Loading />;
-  const { weights, settings, lifts, weeks, names, muscles, measurements, summary } = data;
+  const { weights, settings, lifts, weeks, names, muscles, measurements, summary, photos } = data;
+  const sharePhotos = () => {
+    const pair = beforeAfter(photos);
+    if (!pair) return;
+    const from = pair.before.takenAt.slice(0, 10);
+    const to = pair.after.takenAt.slice(0, 10);
+    const workouts = new Set(data.dates.map((d) => d.slice(0, 10)).filter((d) => d >= from && d <= to)).size;
+    setCard(photoCardContent({ ...pair, weights: data.allWeights, workouts, units: settings.units }));
+  };
   // Scale so the top of the target band and the busiest muscle both fit.
   const muscleMax = Math.max(WEEKLY_SETS.high + 4, ...muscles.map((m) => m.sets));
   const unit = settings.units;
@@ -141,6 +156,9 @@ export default function ProgressScreen() {
           </Pressable>
         )}
       </Card>
+
+      <SectionLabel>Progress photos</SectionLabel>
+      <ProgressPhotos photos={photos} onChange={reload} onShare={sharePhotos} />
 
       <SectionLabel>Body measurements</SectionLabel>
       <Measurements entries={measurements} units={unit} onChange={reload} />

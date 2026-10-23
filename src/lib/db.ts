@@ -4,11 +4,12 @@ import { EXERCISES } from './exercises';
 import type { FoodEntry, FoodItem, Meal } from './nutrition';
 import type { ExportRow } from './exportCsv';
 import { fromCm, toCm, type BodyPart, type Measurement } from './measurements';
+import type { ProgressPhoto } from './progressPhotos';
 import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export const DATABASE_NAME = 'liftlab.db';
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 /*
  * Units: weights are stored in kilograms and distances in kilometres. They are
@@ -138,6 +139,17 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
         cm REAL NOT NULL
       );
       CREATE INDEX IF NOT EXISTS body_measurements_part ON body_measurements(part, measured_at);
+    `);
+  }
+  if (version < 8) {
+    // Progress photos as data URIs. They stay on the phone; nothing syncs them.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS progress_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        taken_at TEXT NOT NULL,
+        uri TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS progress_photos_at ON progress_photos(taken_at);
     `);
   }
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -541,4 +553,18 @@ export async function loadMeasurements(db: SQLiteDatabase): Promise<Measurement[
     'SELECT * FROM body_measurements ORDER BY measured_at',
   );
   return rows.map((r) => ({ id: r.id, part: r.part as BodyPart, measuredAt: r.measured_at, value: fromCm(r.cm, units) }));
+}
+
+export async function addProgressPhoto(db: SQLiteDatabase, uri: string, at = new Date()): Promise<void> {
+  await db.runAsync('INSERT INTO progress_photos (taken_at, uri) VALUES (?, ?)', at.toISOString(), uri);
+}
+
+export async function deleteProgressPhoto(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM progress_photos WHERE id = ?', id);
+}
+
+/** Every progress photo, oldest first. */
+export async function loadProgressPhotos(db: SQLiteDatabase): Promise<ProgressPhoto[]> {
+  const rows = await db.getAllAsync<{ id: number; taken_at: string; uri: string }>('SELECT * FROM progress_photos ORDER BY taken_at');
+  return rows.map((r) => ({ id: r.id, takenAt: r.taken_at, uri: r.uri }));
 }
