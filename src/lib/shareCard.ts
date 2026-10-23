@@ -95,3 +95,32 @@ export function prCardContent(p: PrCardInput, locale?: string): CardContent {
     footer: 'Planned and tracked with LiftLab',
   };
 }
+
+export interface BadgeCardInput {
+  title: string;
+  /** What it took, e.g. "Finish 10 workouts." */
+  how: string;
+  at: string;
+  earned: number;
+  total: number;
+  workouts: number;
+  bestStreak: number;
+}
+
+/** The card for a badge someone just unlocked. */
+export function badgeCardContent(b: BadgeCardInput, locale?: string): CardContent {
+  const day = new Date(b.at).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
+  const stats = [
+    { value: `${b.earned}/${b.total}`, label: 'BADGES' },
+    { value: compactNumber(b.workouts), label: b.workouts === 1 ? 'WORKOUT' : 'WORKOUTS' },
+    b.bestStreak > 0 ? { value: String(b.bestStreak), label: 'BEST WK STREAK' } : null,
+  ].filter((s): s is { value: string; label: string } => s != null);
+  return {
+    eyebrow: `BADGE UNLOCKED · ${day}`,
+    headline: b.title.toUpperCase(),
+    stats,
+    lines: [{ name: 'How I earned it', detail: b.how.replace(/\.$/, ''), pr: false }],
+    more: 0,
+    footer: 'Planned and tracked with LiftLab',
+  };
+}

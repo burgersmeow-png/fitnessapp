@@ -1,18 +1,21 @@
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '../components/Icon';
 import { ProgressRing } from '../components/ProgressRing';
+import { ShareCardSheet } from '../components/ShareCardSheet';
 import { Loading } from '../components/ui';
 import { loadSettings } from '../lib/db';
 import { formatDate } from '../lib/format';
 import { badgeHow, BADGES, goalLine, weekProgress } from '../lib/habits';
+import { badgeCardContent, type CardContent } from '../lib/shareCard';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habits';
 
 export default function BadgesScreen() {
   const db = useSQLiteContext();
+  const [card, setCard] = useState<CardContent | null>(null);
   const [data] = useFocusData(async () => {
     const settings = await loadSettings(db);
     const [state, dates] = await Promise.all([checkBadges(db, settings.weeklyGoal), loadSessionDates(db)]);
@@ -48,11 +51,26 @@ export default function BadgesScreen() {
           const got = earned[b.id];
           const progress = b.progress(stats);
           return (
-            <View
+            <Pressable
               key={b.id}
-              style={[styles.badge, freshIds.has(b.id) && styles.fresh]}
-              accessible
-              accessibilityLabel={`${b.title}. ${got ? 'Earned' : `Locked. ${badgeHow(b, settings.units)}`}`}
+              style={({ pressed }) => [styles.badge, freshIds.has(b.id) && styles.fresh, pressed && got && { opacity: 0.8 }]}
+              disabled={!got}
+              onPress={() =>
+                got &&
+                setCard(
+                  badgeCardContent({
+                    title: b.title,
+                    how: badgeHow(b, settings.units),
+                    at: got.at,
+                    earned: count,
+                    total: BADGES.length,
+                    workouts: stats.workouts,
+                    bestStreak: stats.bestStreak,
+                  }),
+                )
+              }
+              accessibilityRole={got ? 'button' : undefined}
+              accessibilityLabel={`${b.title}. ${got ? 'Earned. Share it' : `Locked. ${badgeHow(b, settings.units)}`}`}
             >
               <View style={[styles.medal, got ? { backgroundColor: 'rgba(245,181,61,0.16)' } : null]}>
                 <Icon name={got ? b.icon : 'lock'} size={26} color={got ? colors.warning : colors.textMuted} />
@@ -72,15 +90,24 @@ export default function BadgesScreen() {
                   </View>
                 </>
               )}
-            </View>
+              {got && (
+                <View style={styles.shareHint}>
+                  <Icon name="share" size={13} color={colors.accent} />
+                  <Text style={styles.shareText}>Share</Text>
+                </View>
+              )}
+            </Pressable>
           );
         })}
       </View>
+      <ShareCardSheet content={card} onClose={() => setCard(null)} title="Share your badge" fileName="liftlab-badge.png" />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  shareHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: space.xs },
+  shareText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
   screen: { flex: 1, backgroundColor: colors.background },
   summary: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },

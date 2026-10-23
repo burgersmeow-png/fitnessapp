@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cardContent, compactNumber, prCardContent, type CardInput } from './shareCard';
+import { badgeCardContent, cardContent, compactNumber, prCardContent, type CardInput } from './shareCard';
 
 const base: CardInput = {
   startedAt: new Date(2026, 9, 23, 7).toISOString(),
@@ -54,4 +54,12 @@ test('a single PR card leads with the lift and shows the gain', () => {
 test('a one-rep PR says REP, not REPS', () => {
   const c = prCardContent({ exercise: 'Deadlift', weight: 180, reps: 1, e1rm: 180, gain: 5, at: new Date().toISOString(), units: 'kg' });
   assert.equal(c.stats[0].label, 'KG × 1 REP');
+});
+
+test('a badge card names the badge and how it was earned', () => {
+  const c = badgeCardContent({ title: 'Ten down', how: 'Finish 10 workouts.', at: new Date(2026, 9, 23).toISOString(), earned: 4, total: 18, workouts: 10, bestStreak: 0 }, 'en-US');
+  assert.equal(c.headline, 'TEN DOWN');
+  assert.equal(c.eyebrow, 'BADGE UNLOCKED · OCT 23, 2026');
+  assert.deepEqual(c.stats.map((s) => s.value), ['4/18', '10']);
+  assert.equal(c.lines[0].detail, 'Finish 10 workouts');
 });
