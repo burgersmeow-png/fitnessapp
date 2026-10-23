@@ -35,6 +35,7 @@ import { loadChallenge } from '../../services/challenge';
 import { challengeProgress, type ChallengeProgress, type JoinedChallenge } from '../../lib/challenge';
 import { syncRecapNudge, syncReminders } from '../../services/reminders';
 import { loadGyms, saveGyms } from '../../services/gyms';
+import { loadPrefs } from '../../services/exercisePrefs';
 import { switchGym, type Gyms } from '../../lib/gyms';
 import { syncStravaIfDue } from '../../services/strava';
 
@@ -77,7 +78,7 @@ export default function TodayScreen() {
       loadChallenge(db),
       loadPlan(db),
     ]);
-    const [badges, gyms] = await Promise.all([checkBadges(db, settings.weeklyGoal), loadGyms(db)]);
+    const [badges, gyms, prefs] = await Promise.all([checkBadges(db, settings.weeklyGoal), loadGyms(db), loadPrefs(db)]);
     // Re-plan reminders whenever Today opens, so they reflect what's been done.
     syncReminders(db, settings);
     syncRecapNudge(db);
@@ -86,7 +87,7 @@ export default function TodayScreen() {
     // A program decides what to train today; recovery and progression still pick the lifts.
     const step = program ? programStep(program) : null;
     const following = step && !step.finished ? step : null;
-    const planned = generateWorkout(rotated, history, settings, new Date(), cardioFatigue(cardio), following?.day.focus);
+    const planned = generateWorkout(rotated, history, settings, new Date(), cardioFatigue(cardio), following?.day.focus, prefs);
     return {
       workout: following?.deload ? deloadWorkout(planned, settings.units === 'kg' ? 2.5 : 5) : planned,
       step,

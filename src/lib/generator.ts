@@ -1,4 +1,5 @@
 import type { FatigueEvent } from './cardio';
+import { rotationHours, type ExercisePrefs } from './exercisePrefs';
 import { suggestNext } from './progression';
 import type { Equipment, Exercise, Goal, LoggedSet, Muscle, PlannedExercise, Settings } from './types';
 import { ALL_MUSCLES } from './types';
@@ -93,6 +94,7 @@ export interface GeneratedWorkout {
  * 1. Rank muscles by recovery and pick the freshest ones as today's focus.
  * 2. For each focus muscle, pick an exercise the user has equipment for:
  *    compounds first, preferring exercises not done recently so the plan rotates.
+ *    "Suggest more" lifts come round sooner; "don't suggest" lifts are left out.
  * 3. Set sets, reps and rest from the goal, and the weight from progression.
  */
 export function generateWorkout(
@@ -103,10 +105,11 @@ export function generateWorkout(
   extraFatigue: FatigueEvent[] = [],
   /** Muscles to train regardless of recovery, e.g. from a spoken request. */
   focusOverride: Muscle[] = [],
+  prefs: ExercisePrefs = {},
 ): GeneratedWorkout {
   const byId = new Map(exercises.map((e) => [e.id, e]));
   const recovery = muscleRecovery(history, byId, now, extraFatigue);
-  const available = exercises.filter((e) => settings.equipment.includes(e.equipment));
+  const available = exercises.filter((e) => settings.equipment.includes(e.equipment) && prefs[e.id] !== 'never');
   const count = exerciseCount(settings.minutes);
 
   // Small muscles shouldn't lead a session, so big muscles win ties.
@@ -137,7 +140,7 @@ export function generateWorkout(
         .sort(
           (a, b) =>
             Number(b.compound) - Number(a.compound) ||
-            hoursSince(history, b.id, now) - hoursSince(history, a.id, now) ||
+            rotationHours(hoursSince(history, b.id, now), prefs[b.id]) - rotationHours(hoursSince(history, a.id, now), prefs[a.id]) ||
             EQUIPMENT_PREFERENCE[b.equipment] - EQUIPMENT_PREFERENCE[a.equipment] ||
             a.name.localeCompare(b.name),
         );
