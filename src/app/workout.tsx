@@ -42,6 +42,9 @@ import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
 import { LiftTools } from '../components/workout/LiftTools';
 import { SwapSheet } from '../components/workout/SwapSheet';
+import { LiftNote } from '../components/LiftNote';
+import { loadNotes, saveNote } from '../services/notes';
+import type { LiftNotes } from '../lib/notes';
 
 function close() {
   if (router.canGoBack()) router.back();
@@ -81,6 +84,7 @@ export default function WorkoutScreen() {
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachReply, setCoachReply] = useState<string | null>(null);
   const [history, setHistory] = useState<LoggedSet[]>([]);
+  const [notes, setNotes] = useState<LiftNotes>({});
   // The exercise group being swapped, by its first set's id.
   const [swapping, setSwapping] = useState<number | null>(null);
 
@@ -93,7 +97,8 @@ export default function WorkoutScreen() {
         close();
         return;
       }
-      const [list, history, s] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db)]);
+      const [list, history, s, n] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), loadNotes(db)]);
+      setNotes(n);
       const workoutSets = await loadWorkoutSets(db, id);
       const thisWorkout = new Set(workoutSets.map((w) => w.completedAt).filter(Boolean));
       const prior = history.filter((h) => !thisWorkout.has(h.completedAt));
@@ -513,6 +518,9 @@ export default function WorkoutScreen() {
                   next={(g.sets.find((s) => !s.completedAt) ?? g.sets[g.sets.length - 1]).weight}
                   warmupFirst={firstHeavy}
                 />
+              )}
+              {left > 0 && (
+                <LiftNote note={notes[g.exerciseId]} onSave={async (text) => setNotes(await saveNote(db, g.exerciseId, text))} />
               )}
               <View style={styles.columns}>
                 <Text style={[styles.colLabel, { width: 28 }]}>SET</Text>

@@ -10,12 +10,14 @@ import { EXERCISE_GUIDE } from '../../lib/exerciseGuide';
 import { estimate1RM } from '../../lib/progression';
 import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
+import { LiftNote } from '../../components/LiftNote';
+import { loadNotes, saveNote } from '../../services/notes';
 
 export default function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
-  const [data] = useFocusData(async () => {
-    const [exercises, history, settings] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db)]);
+  const [data, reload] = useFocusData(async () => {
+    const [exercises, history, settings, notes] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), loadNotes(db)]);
     const sets = history.filter((s) => s.exerciseId === id);
     // Best estimated 1RM per training day, oldest first.
     const byDay = new Map<string, { e1rm: number; weight: number; reps: number }>();
@@ -25,11 +27,11 @@ export default function ExerciseScreen() {
       if (!byDay.has(day) || e1rm > byDay.get(day)!.e1rm) byDay.set(day, { e1rm, weight: s.weight, reps: s.reps });
     }
     const sessions = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, ...v }));
-    return { exercise: exercises.find((e) => e.id === id), sessions, units: settings.units };
+    return { exercise: exercises.find((e) => e.id === id), sessions, units: settings.units, note: notes[id] };
   }, [id]);
 
   if (!data?.exercise) return <Loading />;
-  const { exercise, sessions, units } = data;
+  const { exercise, sessions, units, note } = data;
   const best = Math.max(0, ...sessions.map((s) => s.e1rm));
   const recent = sessions.slice(-12);
   const steps = EXERCISE_GUIDE[exercise.id] ?? [];
@@ -45,6 +47,13 @@ export default function ExerciseScreen() {
       </Text>
 
       <View style={{ marginTop: space.md }}>
+        <LiftNote
+          note={note}
+          onSave={async (text) => {
+            await saveNote(db, exercise.id, text);
+            reload();
+          }}
+        />
         <ExerciseDemo exercise={exercise} />
       </View>
 

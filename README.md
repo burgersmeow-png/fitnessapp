@@ -204,6 +204,7 @@ Code layout:
 - `src/lib/plates.ts` warm-up sets and plates per side of the bar (`src/components/workout/LiftTools.tsx`)
 - `src/lib/swap.ts` stand-in lifts for a mid-workout swap (`src/components/workout/SwapSheet.tsx`)
 - `src/lib/repeat.ts` past workout to a fresh plan ("Do this workout again" on `src/app/session/[id].tsx`)
+- `src/lib/notes.ts` personal notes per lift (`src/components/LiftNote.tsx`, `src/services/notes.ts`)
 - `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
 - `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
 - `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting
