@@ -4,7 +4,7 @@ export function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   });
   res.end(JSON.stringify(body));
 }
@@ -16,8 +16,8 @@ export function redirect(res: ServerResponse, location: string) {
 
 export class BodyTooLarge extends Error {}
 
-/** Reads and parses a JSON body, refusing anything over `maxBytes`. */
-export async function readJson(req: IncomingMessage, maxBytes: number): Promise<unknown> {
+/** Reads a body as text, refusing anything over `maxBytes`. */
+export async function readText(req: IncomingMessage, maxBytes: number): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
@@ -25,7 +25,12 @@ export async function readJson(req: IncomingMessage, maxBytes: number): Promise<
     if (size > maxBytes) throw new BodyTooLarge();
     chunks.push(chunk as Buffer);
   }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/** Reads and parses a JSON body, refusing anything over `maxBytes`. */
+export async function readJson(req: IncomingMessage, maxBytes: number): Promise<unknown> {
+  return JSON.parse(await readText(req, maxBytes));
 }
 
 /** This server's own address as the phone sees it, e.g. http://192.168.1.20:8787. */

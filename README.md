@@ -91,8 +91,8 @@ on the phone; only a summary of each finished session is shared. To set it up (a
 1. Sign up at [supabase.com](https://supabase.com) and create a **New project** on the free plan. Pick
    the region closest to you and save the database password somewhere safe.
 2. Open **SQL Editor**. For each file in `supabase/migrations/`, oldest first, start a new query, paste
-   the whole file, and press **Run**. Today that's `20261023000000_social.sql` then
-   `20261023010000_coaching.sql`.
+   the whole file, and press **Run**. Today that's `20261023000000_social.sql`,
+   `20261023010000_coaching.sql`, then `20261023020000_payments.sql`.
 3. Under **Authentication → Sign In / Providers → Email**, turn off **Confirm email** while you test. The
    free plan only sends a few emails an hour.
 4. Open **Connect** (or **Project Settings → API**) and copy the **Project URL** and the **anon** (or
@@ -111,6 +111,39 @@ press **Restore** in the Supabase dashboard to wake one up.
 
 To check the privacy rules against a test project:
 `SUPABASE_URL=... SUPABASE_ANON_KEY=... npm run test:social` (it creates and deletes throwaway accounts).
+
+## Paid coaching (Stripe)
+
+Coaches can charge clients a monthly price. Clients pay on Stripe's own checkout page and the money goes
+straight to the coach's bank through Stripe Connect. Stripe has no monthly fee; it takes a cut of each
+payment (see [stripe.com/pricing](https://stripe.com/pricing)). Without this setup, coaching simply stays free.
+
+1. Sign up at [stripe.com](https://stripe.com) and stay in **test mode** (no real money moves).
+2. Under **Connect**, finish the platform setup and choose **Express** accounts for your coaches.
+3. Copy your **secret key** (`sk_test_...`) from **Developers → API keys**.
+4. In Supabase, copy the **service_role** key from **Project Settings → API**. It goes on the server only,
+   never in the app or `.env.local`.
+5. Webhooks need a public address. While testing on your PC, install the
+   [Stripe CLI](https://docs.stripe.com/stripe-cli) and run
+   `stripe listen --forward-to localhost:8787/pay/webhook --forward-connect-to localhost:8787/pay/webhook`.
+   It prints a signing secret (`whsec_...`).
+6. Start the server (PowerShell):
+
+   ```powershell
+   $env:STRIPE_SECRET_KEY = "sk_test_..."
+   $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
+   $env:SUPABASE_URL = "https://abcdefgh.supabase.co"
+   $env:SUPABASE_SERVICE_ROLE_KEY = "eyJ..."
+   npm run server
+   ```
+
+7. In the app: **Friends → Coaching**, turn on coach mode, set a price and tap **Set up payouts**. A client
+   who joins with your code sees **Subscribe**. Stripe's test card is `4242 4242 4242 4242`.
+
+Optional: `PLATFORM_FEE_PERCENT=10` keeps 10% of each payment for you; the default is 0. Leaving a coach,
+or a coach removing a client, stops the subscription straight away. App Store note: Apple lets apps take
+payment outside in-app purchase for real person-to-person services such as personal training, but
+review decides, so describe the coaching clearly when you submit.
 
 ## Strava (switched off for now)
 
@@ -148,8 +181,10 @@ Code layout:
 - `src/lib/voice.ts` understands spoken coach commands (offline)
 - `src/lib/barcode.ts` barcode checks and Open Food Facts parsing; `src/services/barcode.ts` the lookup
 - `src/lib/nutrition.ts` calorie and macro targets, totals, photo-estimate checks, common foods
-- `server/` the helper server: meal photo estimates (Claude, prompt in `src/lib/foodPrompt.ts`) and Strava sign-in
+- `server/` the helper server: meal photo estimates (Claude, prompt in `src/lib/foodPrompt.ts`), Strava sign-in and coach payments (Stripe)
 - `src/lib/coaching.ts` client summaries and coach plans; `src/services/coaching.ts` codes, plans, messages
+- `src/lib/payments.ts` prices and subscription labels; `src/services/payments.ts` payouts, subscribe, cancel
+- `src/lib/habits.ts` weekly goal, streaks, badges, reminder times; `src/lib/programs.ts` training programs
 - `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
 - `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
 - `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting

@@ -4,6 +4,8 @@ import { loadRecord, saveRecord } from '../lib/db';
 import type { FeedPost, Profile } from '../lib/social';
 import { fail, loadFeed, myId, SocialError, toProfile, type ProfileRow } from './social';
 import { supabase } from './supabase';
+import { cancelSubscription, toSubscription, type CoachingPaidRow } from './payments';
+import type { Subscription } from '../lib/payments';
 
 type AssignmentRow = {
   id: number;
@@ -48,23 +50,34 @@ export async function joinCoach(code: string): Promise<void> {
   fail(error);
 }
 
-/** Who coaches you, and who you coach. */
-export async function loadCoaching(): Promise<{ coach: Profile | null; clients: Profile[] }> {
+/** Who coaches you, and who you coach, with each pair's subscription. */
+export async function loadCoaching(): Promise<{
+  coach: Profile | null;
+  mySubscription: Subscription;
+  clients: Profile[];
+  clientSubscriptions: Map<string, Subscription>;
+}> {
   const me = await myId();
   const { data, error } = await supabase
     .from('coaching')
-    .select('coach, client, c:profiles!coaching_coach_fkey(id, username, display_name), cl:profiles!coaching_client_fkey(id, username, display_name)');
+    .select(
+      'coach, client, paid_status, paid_until, cancels_at_period_end, c:profiles!coaching_coach_fkey(id, username, display_name), cl:profiles!coaching_client_fkey(id, username, display_name)',
+    );
   fail(error);
   const rows = data ?? [];
   const asClient = rows.find((r) => r.client === me);
   return {
     coach: asClient ? toProfile(asClient.c as unknown as ProfileRow) : null,
+    mySubscription: asClient ? toSubscription(asClient as CoachingPaidRow) : { status: 'none', until: null, ending: false },
     clients: rows.filter((r) => r.coach === me).map((r) => toProfile(r.cl as unknown as ProfileRow)),
+    clientSubscriptions: new Map(rows.filter((r) => r.coach === me).map((r) => [r.client, toSubscription(r as CoachingPaidRow)])),
   };
 }
 
-/** Ends a coaching relationship, from either side. */
+/** Ends a coaching relationship, from either side. Any subscription stops first, so nobody pays for coaching that's over. */
 export async function endCoaching(coach: string, client: string): Promise<void> {
+  const { data } = await supabase.from('coaching').select('paid_status').eq('coach', coach).eq('client', client).maybeSingle();
+  if (data && data.paid_status !== 'none' && data.paid_status !== 'canceled') await cancelSubscription({ client, now: true });
   fail((await supabase.from('coaching').delete().eq('coach', coach).eq('client', client)).error);
 }
 

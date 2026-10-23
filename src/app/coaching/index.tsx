@@ -2,9 +2,12 @@ import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../../components/Icon';
+import { ClientSubscription } from '../../components/coaching/ClientSubscription';
+import { CoachPricing } from '../../components/coaching/CoachPricing';
 import { Avatar } from '../../components/social/Avatar';
 import { Button, Card, Loading, SectionLabel } from '../../components/ui';
 import { dayLabel, nextAssignment, sortClients, summarizeClient } from '../../lib/coaching';
+import { subscriptionLabel } from '../../lib/payments';
 import { timeAgo } from '../../lib/social';
 import { colors, radius, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
@@ -17,6 +20,7 @@ import {
   loadCoaching,
   myCoachCode,
 } from '../../services/coaching';
+import { loadCoachOffer, loadPayouts, paymentsAvailable, refreshPayouts } from '../../services/payments';
 import { myId, SocialError } from '../../services/social';
 
 function confirm(title: string, message: string, action: string, onYes: () => void) {
@@ -37,11 +41,20 @@ export default function CoachingScreen() {
   const [data, reload] = useFocusData(async () => {
     const [me, coaching, myCode, assignments] = await Promise.all([myId(), loadCoaching(), existingCoachCode(), loadAssignments()]);
     const sessions = coaching.clients.length ? await loadClientSessions() : [];
+    let payouts = paymentsAvailable && myCode ? await loadPayouts() : null;
+    // Back from Stripe's sign-up: ask whether payments are on yet.
+    if (payouts?.connected && !payouts.chargesEnabled) {
+      await refreshPayouts().catch(() => {});
+      payouts = await loadPayouts();
+    }
+    const offer = paymentsAvailable && coaching.coach ? await loadCoachOffer() : null;
     const now = new Date();
     return {
       me,
       ...coaching,
       myCode,
+      payouts,
+      offer,
       next: nextAssignment(assignments.filter((a) => a.client === me), now),
       clients: sortClients(coaching.clients.map((c) => summarizeClient(c, sessions, assignments, now))),
     };
@@ -83,8 +96,9 @@ export default function CoachingScreen() {
           <Text style={[styles.muted, { marginTop: space.md }]}>
             {data.next ? `Next from your coach: ${data.next.title} (${dayLabel(data.next.scheduledFor, now)}). It’s on your Today screen.` : 'Workouts your coach sends show up on your Today screen.'}
           </Text>
+          <ClientSubscription offer={data.offer} sub={data.mySubscription} act={act} confirm={confirm} />
           <Pressable
-            onPress={() => confirm(`Leave ${data.coach!.displayName}?`, 'They’ll stop seeing your sessions, and your plans and messages with them are hidden.', 'Leave', () => act(() => endCoaching(data.coach!.id, data.me)))}
+            onPress={() => confirm(`Leave ${data.coach!.displayName}?`, `They’ll stop seeing your sessions, and your plans and messages with them are hidden.${data.mySubscription.status === 'active' ? ' Your subscription stops today.' : ''}`, 'Leave', () => act(() => endCoaching(data.coach!.id, data.me)))}
             accessibilityRole="button"
             style={{ marginTop: space.md }}
           >
@@ -132,6 +146,7 @@ export default function CoachingScreen() {
               <Text style={styles.link}>Share code</Text>
             </Pressable>
           </Card>
+          {data.payouts && <CoachPricing payouts={data.payouts} act={act} onNote={setNote} />}
           {data.clients.length === 0 && <Text style={styles.muted}>No clients yet. Share your code to get started.</Text>}
           {data.clients.map((s) => (
             <Pressable
@@ -147,6 +162,9 @@ export default function CoachingScreen() {
                   {s.lastSessionAt ? `Last session ${timeAgo(s.lastSessionAt)} ago` : 'No sessions yet'} · {s.sessionsThisWeek} this week
                   {s.due ? ` · plan ${s.done}/${s.due}` : ''}
                 </Text>
+                {data.payouts?.priceCents != null && (
+                  <PaidChip label={subscriptionLabel(data.clientSubscriptions.get(s.client.id) ?? { status: 'none', until: null, ending: false })} />
+                )}
               </View>
               {s.needsNudge && <Text style={styles.nudge}>Check in</Text>}
               <Icon name="chevron" size={16} color={colors.textMuted} />
@@ -156,7 +174,7 @@ export default function CoachingScreen() {
       ) : (
         <Card>
           <Text style={styles.body}>
-            Personal trainer? Coach clients here: see every session they log, send them workouts, and message them. Free while LiftLab is in testing.
+            Personal trainer? Coach clients here: see every session they log, send them workouts, and message them.{paymentsAvailable ? ' Charge a monthly price if you like.' : ''}
           </Text>
           <Button title="Turn on coach mode" variant="secondary" onPress={() => act(async () => void (await myCoachCode()))} style={{ marginTop: space.md }} />
         </Card>
@@ -183,6 +201,12 @@ export default function CoachingScreen() {
       )}
     </ScrollView>
   );
+}
+
+function PaidChip({ label }: { label: ReturnType<typeof subscriptionLabel> }) {
+  const color = label.tone === 'good' ? colors.success : label.tone === 'warn' ? colors.warning : colors.textMuted;
+  const text = label.tone === 'good' ? 'Paid' : label.text === 'Not subscribed' ? 'Unpaid' : label.text;
+  return <Text style={[styles.nudge, { color, marginTop: 2 }]}>{text}</Text>;
 }
 
 const styles = StyleSheet.create({

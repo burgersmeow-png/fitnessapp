@@ -140,3 +140,31 @@ test('coaching rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_A
 
   for (const u of [coach, client, eve, other]) await u.c.rpc('delete_account');
 });
+
+test('payment rules', { skip: !SUPABASE_URL && 'set SUPABASE_URL and SUPABASE_ANON_KEY' }, async () => {
+  const coach = await user('paycoach');
+  const client = await user('payclient');
+  const eve = await user('payeve');
+  const code = (await coach.c.rpc('coach_code')).data;
+  assert.ifError((await client.c.rpc('join_coach', { invite: code })).error);
+
+  // A coach sets their own price, but can't connect a payout account or switch on payments themselves.
+  assert.ifError((await coach.c.from('coach_payouts').insert({ coach: coach.id, price_cents: 4000 })).error);
+  assert.ifError((await coach.c.from('coach_payouts').upsert({ coach: coach.id, price_cents: 4500 })).error);
+  assert.ifError((await coach.c.from('coach_payouts').update({ price_cents: 5000 }).eq('coach', coach.id)).error);
+  assert.ok((await coach.c.from('coach_payouts').update({ charges_enabled: true }).eq('coach', coach.id)).error);
+  assert.ok((await coach.c.from('coach_payouts').update({ stripe_account: 'acct_fake' }).eq('coach', coach.id)).error);
+  assert.ok((await eve.c.from('coach_payouts').insert({ coach: coach.id, price_cents: 1 })).error);
+  assert.equal((await eve.c.from('coach_payouts').select()).data.length, 0);
+
+  // The client sees the offer; others see nothing.
+  assert.deepEqual((await client.c.rpc('my_coach_offer')).data, [{ price_cents: 5000, currency: 'usd', ready: false }]);
+  assert.deepEqual((await eve.c.rpc('my_coach_offer')).data, []);
+
+  // Nobody marks themselves as paid.
+  await client.c.from('coaching').update({ paid_status: 'active' }).eq('client', client.id);
+  await coach.c.from('coaching').update({ paid_status: 'active' }).eq('client', client.id);
+  assert.equal((await client.c.from('coaching').select('paid_status').single()).data.paid_status, 'none');
+
+  for (const u of [coach, client, eve]) await u.c.rpc('delete_account');
+});
