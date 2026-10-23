@@ -43,7 +43,7 @@ import { freshWin } from '../services/challenge';
 import { beatCardContent, beatLine, beatResult, type BeatResult } from '../lib/beat';
 import { takeDare } from '../services/beat';
 import { syncChallengeEntry } from '../services/challengeBoard';
-import { cardContent, type CardContent } from '../lib/shareCard';
+import { badgeCardContent, cardContent, streakCardContent, type CardContent } from '../lib/shareCard';
 import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
 import { finishAssignedWorkout } from '../services/coaching';
@@ -52,7 +52,7 @@ import { finishPlanWorkout } from '../services/plan';
 import { flushCreator } from '../services/creatorCode';
 import { syncCrew } from '../services/crew';
 import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habits';
-import { goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/habits';
+import { badgeHow, BADGES, goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/habits';
 import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
 import { LiftTools } from '../components/workout/LiftTools';
@@ -77,6 +77,8 @@ interface Summary {
   strava: WorkoutForStrava;
   week: WeekProgress;
   badges: Badge[];
+  /** For the badge and streak story cards. */
+  habit: { earned: number; workouts: number; bestStreak: number };
   link: WorkoutLink;
   won: { challenge: JoinedChallenge; progress: ChallengeProgress } | null;
   dare: { title: string; who: string | null; result: BeatResult } | null;
@@ -397,6 +399,7 @@ export default function WorkoutScreen() {
         prs: prNames,
         week: weekProgress(dates, goal),
         badges: badges.fresh,
+        habit: { earned: BADGES.filter((b) => badges.earned[b.id]).length, workouts: badges.stats.workouts, bestStreak: badges.stats.bestStreak },
         won,
         dare: dare ? { title: dare.title, who: dare.who, result: beatResult(dare.target, volume, units) } : null,
         link: {
@@ -477,7 +480,16 @@ export default function WorkoutScreen() {
           <Stat label={`Volume (${settings?.units})`} value={formatNumber(summary.volume)} />
           <Stat label="Minutes" value={String(summary.minutes)} />
         </View>
-        <View style={styles.goalRow}>
+        <Pressable
+          style={styles.goalRow}
+          disabled={summary.week.streak < 1}
+          onPress={() => {
+            setCardTitle('Share your streak');
+            setCard(streakCardContent({ ...summary.week, bestStreak: summary.habit.bestStreak, workouts: summary.habit.workouts, now: new Date() }));
+          }}
+          accessibilityRole={summary.week.streak > 0 ? 'button' : 'text'}
+          accessibilityLabel={summary.week.streak > 0 ? `${summary.week.streak}-week streak. Share it` : undefined}
+        >
           <ProgressRing done={summary.week.done} total={summary.week.goal} size={56} stroke={5} what="training days" />
           <View style={{ flex: 1, marginLeft: space.md }}>
             <Text style={styles.goalTitle}>
@@ -485,9 +497,29 @@ export default function WorkoutScreen() {
             </Text>
             <Text style={styles.goalMeta}>{goalLine(summary.week)}</Text>
           </View>
-        </View>
+          {summary.week.streak > 0 && <Icon name="share" size={20} color={colors.accent} />}
+        </Pressable>
         {summary.badges.slice(0, 2).map((b) => (
-          <View key={b.id} style={styles.badgeRow}>
+          <Pressable
+            key={b.id}
+            style={styles.badgeRow}
+            onPress={() => {
+              setCardTitle('Share your badge');
+              setCard(
+                badgeCardContent({
+                  title: b.title,
+                  how: badgeHow(b, settings?.units ?? 'lb'),
+                  at: new Date().toISOString(),
+                  earned: summary.habit.earned,
+                  total: BADGES.length,
+                  workouts: summary.habit.workouts,
+                  bestStreak: summary.habit.bestStreak,
+                }),
+              );
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`New badge: ${b.title}. Share it`}
+          >
             <View style={styles.badgeIcon}>
               <Icon name={b.icon} size={22} color={colors.warning} />
             </View>
@@ -495,7 +527,8 @@ export default function WorkoutScreen() {
               <Text style={styles.badgeEyebrow}>NEW BADGE</Text>
               <Text style={styles.goalTitle}>{b.title}</Text>
             </View>
-          </View>
+            <Icon name="share" size={20} color={colors.accent} />
+          </Pressable>
         ))}
         {summary.won && (
           <Pressable
