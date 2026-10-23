@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ExerciseThumb } from '../components/ExerciseThumb';
 import { Icon } from '../components/Icon';
 import { Button, Card, Loading } from '../components/ui';
@@ -69,6 +69,11 @@ export default function TryWorkoutScreen() {
         onPress={toggleSaved}
         style={{ marginTop: space.sm, marginBottom: space.md }}
       />
+      {!router.canGoBack() && (
+        <Pressable onPress={() => router.replace('/')} hitSlop={8} accessibilityRole="button" style={styles.notNow}>
+          <Text style={styles.notNowText}>Not now</Text>
+        </Pressable>
+      )}
       {activeId != null && <Text style={[styles.sub, { marginTop: 0, marginBottom: space.md }]}>Finish your current workout first, then open the link again.</Text>}
 
       {plan.map((p, i) => {
@@ -96,6 +101,8 @@ export default function TryWorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
+  notNow: { alignSelf: 'center', marginBottom: space.md },
+  notNowText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', padding: space.xl },
   sub: { color: colors.textMuted, fontSize: 15, marginTop: space.sm },

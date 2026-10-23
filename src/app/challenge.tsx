@@ -67,6 +67,11 @@ export default function ChallengeScreen() {
         <Text style={styles.sub}>{rules(invite)} Day 1 is the day you join.</Text>
         <Button title="Join challenge" onPress={() => join(invite)} style={{ marginTop: space.lg }} />
         {joined && progress?.status === 'active' && <Text style={styles.sub}>You’re in {joined.title}. Joining this one replaces it.</Text>}
+        {!router.canGoBack() && (
+          <Pressable onPress={() => router.replace('/')} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: space.lg }}>
+            <Text style={styles.notNow}>Not now</Text>
+          </Pressable>
+        )}
       </ScrollView>
     );
   }
@@ -133,6 +138,9 @@ export default function ChallengeScreen() {
           ))}
         </>
       )}
+      {joined && !router.canGoBack() && (
+        <Button title="Go to Today" onPress={() => router.replace('/')} style={{ marginTop: space.lg }} />
+      )}
       <ShareCardSheet content={card} onClose={() => setCard(null)} title="Share your challenge" fileName="liftlab-challenge.png" />
     </ScrollView>
   );
@@ -145,6 +153,7 @@ const styles = StyleSheet.create({
   hero: { flexDirection: 'row', alignItems: 'center' },
   row: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   status: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginTop: space.sm },
+  notNow: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
   leave: { color: colors.danger, fontSize: 15, fontWeight: '600' },
   input: { minHeight: 48, borderRadius: radius.sm, backgroundColor: colors.surface, color: colors.text, paddingHorizontal: space.md, fontSize: 16, marginBottom: space.sm },
   preset: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: colors.surface, marginBottom: space.sm, minHeight: 64 },
