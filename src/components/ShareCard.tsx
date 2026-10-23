@@ -8,6 +8,9 @@ export const CARD_H = 1920;
 const X = 90;
 const FONT = 'Inter, -apple-system, Helvetica Neue, Helvetica, Arial, sans-serif';
 
+/** Big as fits: heavy caps run about 0.7 of the font size per letter. */
+export const headlineSize = (s: string) => Math.min(136, Math.floor((CARD_W - 2 * X) / (s.length * 0.7)));
+
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
 /**
@@ -37,7 +40,7 @@ export const ShareCard = forwardRef<Svg, { content: CardContent; width: number }
       <Text x={X + 90} y={168} fontSize={48} fontWeight="900" fill={colors.text} letterSpacing={6} fontFamily={FONT}>LIFTLAB</Text>
 
       <Text x={X} y={340} fontSize={38} fontWeight="700" fill={colors.textMuted} letterSpacing={4} fontFamily={FONT}>{content.eyebrow}</Text>
-      <Text x={X} y={480} fontSize={content.headline.length > 13 ? 96 : content.headline.length > 11 ? 112 : 136} fontWeight="900" fill={colors.text} fontFamily={FONT}>{content.headline}</Text>
+      <Text x={X} y={480} fontSize={headlineSize(content.headline)} fontWeight="900" fill={colors.text} fontFamily={FONT}>{content.headline}</Text>
       <Rect x={X} y={530} width={140} height={14} rx={7} fill={colors.accent} />
 
       {content.stats.map((s, i) => {

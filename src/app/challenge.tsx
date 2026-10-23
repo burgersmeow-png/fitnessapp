@@ -7,7 +7,7 @@ import { Icon } from '../components/Icon';
 import { ProgressRing } from '../components/ProgressRing';
 import { ShareCardSheet } from '../components/ShareCardSheet';
 import { Button, Card, Loading, SectionLabel } from '../components/ui';
-import { challengeCardContent, challengeProgress, challengeUrl, decodeChallenge, PRESETS, TITLE_MAX, type ChallengeDef } from '../lib/challenge';
+import { challengeCardContent, challengeProgress, challengeUrl, decodeChallenge, PRESETS, TITLE_MAX, trainingDays, type ChallengeDef } from '../lib/challenge';
 import type { CardContent } from '../lib/shareCard';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
@@ -16,7 +16,7 @@ import { loadSessionDates } from '../services/habits';
 import { SITE_URL } from '../services/server';
 import { shareLink } from '../services/shareLink';
 
-const rules = (c: ChallengeDef) => `${c.sessions} training days in ${c.days} days. Lifting and cardio both count, once per day.`;
+const rules = (c: ChallengeDef) => `${trainingDays(c.sessions)} in ${c.days} days. Lifting and cardio both count, once per day.`;
 
 /** Your challenge, or an invite opened from a link (liftlab://challenge?c=…). */
 export default function ChallengeScreen() {
@@ -126,7 +126,7 @@ export default function ChallengeScreen() {
               <Icon name="flame" size={20} color={colors.accent} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.presetTitle}>{p.title}</Text>
-                <Text style={styles.meta}>{p.sessions} training days in {p.days} days</Text>
+                <Text style={styles.meta}>{trainingDays(p.sessions)} in {p.days} days</Text>
               </View>
               <Icon name="chevron" size={14} color={colors.textMuted} />
             </Pressable>

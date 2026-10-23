@@ -15,6 +15,8 @@ export interface ChallengeDef {
 export interface JoinedChallenge extends ChallengeDef {
   /** Local day it started, YYYY-MM-DD. */
   start: string;
+  /** Set once the win has been celebrated, so it shows only once. */
+  celebrated?: boolean;
 }
 
 export const PRESETS: ChallengeDef[] = [
@@ -25,6 +27,8 @@ export const PRESETS: ChallengeDef[] = [
 ];
 
 export const TITLE_MAX = 32;
+
+export const trainingDays = (n: number) => `${n} training ${n === 1 ? 'day' : 'days'}`;
 
 /** null when the numbers can't work: more sessions than days, or out of range. */
 export function cleanChallenge(raw: { title?: unknown; sessions?: unknown; days?: unknown }): ChallengeDef | null {
@@ -99,8 +103,8 @@ export function challengeCardContent(c: JoinedChallenge, p: ChallengeProgress): 
     lines: [
       {
         name: p.status === 'won' ? 'Every session done' : p.status === 'missed' ? `${p.done} of ${c.sessions} sessions` : p.onPace ? 'On pace' : 'Catching up',
-        detail: `${c.sessions} training days in ${c.days} days`,
-        pr: p.status === 'won',
+        detail: `${trainingDays(c.sessions)} in ${c.days} days`,
+        pr: false,
       },
     ],
     more: 0,
