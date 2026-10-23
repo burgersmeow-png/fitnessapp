@@ -1,4 +1,5 @@
-import { suggestWeight } from './progression';
+import type { FatigueEvent } from './cardio';
+import { suggestNext } from './progression';
 import type { Equipment, Exercise, Goal, LoggedSet, Muscle, PlannedExercise, Settings } from './types';
 import { ALL_MUSCLES } from './types';
 
@@ -16,17 +17,22 @@ export function muscleRecovery(
   history: LoggedSet[],
   exercises: Map<string, Exercise>,
   now: Date,
+  extra: FatigueEvent[] = [],
 ): Record<Muscle, number> {
   const fatigue = Object.fromEntries(ALL_MUSCLES.map((m) => [m, 0])) as Record<Muscle, number>;
+  const fadeAt = (iso: string) => {
+    const hours = (now.getTime() - new Date(iso).getTime()) / 36e5;
+    return hours < 0 || hours >= RECOVERY_HOURS ? 0 : 1 - hours / RECOVERY_HOURS;
+  };
   for (const set of history) {
     const exercise = exercises.get(set.exerciseId);
     if (!exercise) continue;
-    const hours = (now.getTime() - new Date(set.completedAt).getTime()) / 36e5;
-    if (hours < 0 || hours >= RECOVERY_HOURS) continue;
-    const fade = 1 - hours / RECOVERY_HOURS;
+    const fade = fadeAt(set.completedAt);
     for (const m of exercise.primary) fatigue[m] += fade;
     for (const m of exercise.secondary) fatigue[m] += 0.5 * fade;
   }
+  // Cardio and anything else that tires muscles outside lifting.
+  for (const e of extra) fatigue[e.muscle] += e.amount * fadeAt(e.completedAt);
   const recovery = {} as Record<Muscle, number>;
   for (const m of ALL_MUSCLES) recovery[m] = Math.max(0, 1 - fatigue[m] / FATIGUE_CAP);
   return recovery;
@@ -94,9 +100,10 @@ export function generateWorkout(
   history: LoggedSet[],
   settings: Settings,
   now: Date = new Date(),
+  extraFatigue: FatigueEvent[] = [],
 ): GeneratedWorkout {
   const byId = new Map(exercises.map((e) => [e.id, e]));
-  const recovery = muscleRecovery(history, byId, now);
+  const recovery = muscleRecovery(history, byId, now, extraFatigue);
   const available = exercises.filter((e) => settings.equipment.includes(e.equipment));
   const count = exerciseCount(settings.minutes);
 
@@ -149,14 +156,19 @@ export function generateWorkout(
     recovery,
     exercises: chosen.map((e) => {
       const p = prescription(settings.goal, e.compound);
+      const next = suggestNext(history, e.id, p.reps, p.rir, increment);
+      const bodyweight = e.equipment === 'bodyweight';
       return {
         exerciseId: e.id,
-        sets: p.sets,
+        // A deload also trims a set to shed fatigue.
+        sets: next.deload ? Math.max(2, p.sets - 1) : p.sets,
         targetReps: p.reps,
         targetRir: p.rir,
-        suggestedWeight:
-          e.equipment === 'bodyweight' ? null : suggestWeight(history, e.id, p.reps, p.rir, increment),
+        suggestedWeight: bodyweight ? null : next.weight,
         restSeconds: p.rest,
+        status: next.status,
+        deload: next.deload,
+        change: bodyweight ? null : next.change,
       };
     }),
   };

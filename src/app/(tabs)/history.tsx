@@ -2,20 +2,23 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSQLiteContext } from 'expo-sqlite';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Card } from '../../components/ui';
-import { loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
+import { CARDIO_BY_TYPE, EFFORTS, type CardioSession } from '../../lib/cardio';
+import { loadCardio, loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
 import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
 
 /** Consecutive weeks (Monday start) with at least one workout, counting back from this week. */
-function weekStreak(workouts: WorkoutSummary[]): number {
+type Entry = { kind: 'lift'; at: string; workout: WorkoutSummary } | { kind: 'cardio'; at: string; cardio: CardioSession };
+
+function weekStreak(dates: string[]): number {
   const weekKey = (d: Date) => {
     const monday = new Date(d);
     monday.setHours(0, 0, 0, 0);
     monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
     return monday.getTime();
   };
-  const weeks = new Set(workouts.map((w) => weekKey(new Date(w.startedAt))));
+  const weeks = new Set(dates.map((d) => weekKey(new Date(d))));
   let streak = 0;
   let cursor = weekKey(new Date());
   // This week still counts if the user hasn't trained yet.
@@ -29,17 +32,25 @@ function weekStreak(workouts: WorkoutSummary[]): number {
 
 export default function HistoryScreen() {
   const db = useSQLiteContext();
-  const [data] = useFocusData(async () => ({ workouts: await loadWorkouts(db), settings: await loadSettings(db) }));
+  const [data] = useFocusData(async () => ({
+    workouts: await loadWorkouts(db),
+    cardio: await loadCardio(db),
+    settings: await loadSettings(db),
+  }));
   if (!data) return <View style={styles.screen} />;
-  const { workouts, settings } = data;
-  const streak = weekStreak(workouts);
+  const { workouts, cardio, settings } = data;
+  const entries: Entry[] = [
+    ...workouts.map((w) => ({ kind: 'lift' as const, at: w.startedAt, workout: w })),
+    ...cardio.map((c) => ({ kind: 'cardio' as const, at: c.startedAt, cardio: c })),
+  ].sort((a, b) => b.at.localeCompare(a.at));
+  const streak = weekStreak(entries.map((e) => e.at));
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={{ padding: space.md, gap: space.md }}
-      data={workouts}
-      keyExtractor={(w) => String(w.id)}
+      data={entries}
+      keyExtractor={(e) => (e.kind === 'lift' ? `w${e.workout.id}` : `c${e.cardio.id}`)}
       ListHeaderComponent={
         <View style={{ flexDirection: 'row', gap: space.md }}>
           <Card style={{ flex: 1 }}>
@@ -49,8 +60,8 @@ export default function HistoryScreen() {
           </Card>
           <Card style={{ flex: 1 }}>
             <Ionicons name="trophy" size={20} color={colors.warning} />
-            <Text style={type.number}>{workouts.length}</Text>
-            <Text style={type.label}>WORKOUTS</Text>
+            <Text style={type.number}>{entries.length}</Text>
+            <Text style={type.label}>SESSIONS</Text>
           </Card>
         </View>
       }
@@ -63,20 +74,46 @@ export default function HistoryScreen() {
           </Text>
         </View>
       }
-      renderItem={({ item }) => (
-        <Card>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={type.title}>{formatDate(item.startedAt)}</Text>
-            <Text style={styles.meta}>{formatDuration(item.startedAt, item.finishedAt)}</Text>
-          </View>
-          <Text style={styles.meta}>
-            {item.sets} sets · {formatNumber(item.volume)} {settings.units} volume
-          </Text>
-          <Text style={[type.body, { marginTop: space.sm }]} numberOfLines={2}>
-            {item.exercises.split(',').join(', ')}
-          </Text>
-        </Card>
-      )}
+      renderItem={({ item }) => {
+        if (item.kind === 'cardio') {
+          const c = item.cardio;
+          const kind = CARDIO_BY_TYPE.get(c.type);
+          const effort = EFFORTS.reduce((best, e) => (Math.abs(e.rpe - c.rpe) < Math.abs(best.rpe - c.rpe) ? e : best));
+          return (
+            <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={styles.icon}>
+                <Ionicons name={(kind?.icon ?? 'pulse') as keyof typeof Ionicons.glyphMap} size={22} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1, marginLeft: space.md }}>
+                <Text style={type.title}>{kind?.label}</Text>
+                <Text style={styles.meta}>
+                  {formatDate(c.startedAt)} · {Math.round(c.minutes)} min{c.distance != null ? ` · ${c.distance} ${settings.units === 'kg' ? 'km' : 'mi'}` : ''} · {effort.label}
+                </Text>
+              </View>
+            </Card>
+          );
+        }
+        const w = item.workout;
+        return (
+          <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.icon}>
+              <Ionicons name="barbell" size={22} color={colors.accent} />
+            </View>
+            <View style={{ flex: 1, marginLeft: space.md }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={type.title}>{formatDate(w.startedAt)}</Text>
+                <Text style={styles.meta}>{formatDuration(w.startedAt, w.finishedAt)}</Text>
+              </View>
+              <Text style={styles.meta}>
+                {w.sets} {w.sets === 1 ? 'set' : 'sets'} · {formatNumber(w.volume)} {settings.units} volume
+              </Text>
+              <Text style={[type.body, { marginTop: space.xs }]} numberOfLines={2}>
+                {w.exercises.split(',').join(', ')}
+              </Text>
+            </View>
+          </Card>
+        );
+      }}
     />
   );
 }
@@ -84,4 +121,12 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+  icon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,90,31,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

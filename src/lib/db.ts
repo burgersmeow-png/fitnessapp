@@ -1,10 +1,11 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import type { CardioSession, CardioType } from './cardio';
 import { EXERCISES } from './exercises';
 import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export const DATABASE_NAME = 'liftlab.db';
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
@@ -43,6 +44,18 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY NOT NULL,
         value TEXT NOT NULL
+      );
+    `);
+  }
+  if (version < 2) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS cardio (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        minutes REAL NOT NULL,
+        distance REAL,
+        rpe INTEGER NOT NULL
       );
     `);
   }
@@ -245,4 +258,28 @@ export async function loadWorkouts(db: SQLiteDatabase): Promise<WorkoutSummary[]
      WHERE w.finished_at IS NOT NULL
      GROUP BY w.id ORDER BY w.started_at DESC`,
   );
+}
+
+export async function saveCardio(db: SQLiteDatabase, c: CardioSession): Promise<void> {
+  await db.runAsync(
+    'INSERT INTO cardio (type, started_at, minutes, distance, rpe) VALUES (?, ?, ?, ?, ?)',
+    c.type, c.startedAt, c.minutes, c.distance, c.rpe,
+  );
+}
+
+/** Cardio sessions, newest first. `sinceDays` limits how far back to look. */
+export async function loadCardio(db: SQLiteDatabase, sinceDays?: number): Promise<CardioSession[]> {
+  const since = sinceDays ? new Date(Date.now() - sinceDays * 864e5).toISOString() : '';
+  const rows = await db.getAllAsync<{ id: number; type: string; started_at: string; minutes: number; distance: number | null; rpe: number }>(
+    'SELECT * FROM cardio WHERE started_at >= ? ORDER BY started_at DESC',
+    since,
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type as CardioType,
+    startedAt: r.started_at,
+    minutes: r.minutes,
+    distance: r.distance,
+    rpe: r.rpe,
+  }));
 }

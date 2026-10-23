@@ -7,10 +7,14 @@ Working name; rename any time in `app.json`.
 
 ## What works today
 
-- **Today**: a generated workout that trains your freshest muscles, with suggested weights from your last session
-- **Workout**: big tap targets, reps-in-reserve per set, rest timer with haptics, PR detection, end-of-workout summary
-- **History**: past workouts, weekly streak, volume
-- **Exercises**: 66 exercises, searchable and filtered by muscle, with a strength trend per exercise
+- **Today**: a generated workout that trains your freshest muscles, with a front and back recovery body map
+- **Progressive overload**: weights come from a 3-session strength trend, rise when you beat your targets,
+  and drop into a deload when a lift stalls
+- **Workout**: big tap targets, reps-in-reserve per set, rest timer with haptics, PR detection, end-of-workout
+  summary, and the next sets re-weighted on the spot when a set felt easier or harder than planned
+- **Cardio**: log runs, rides, rowing, swims and intervals; they count toward muscle recovery
+- **History**: workouts and cardio, weekly streak, volume
+- **Exercises**: 66 exercises with body-map thumbnails, searchable and filtered by muscle, with a strength trend
 - **Settings**: goal (strength, muscle, endurance), workout length, your equipment, lb or kg
 
 Everything is stored on the phone in SQLite, so it works offline.
@@ -46,7 +50,9 @@ Code layout:
 
 - `src/app/` screens (Expo Router: each file is a route)
 - `src/lib/generator.ts` workout generator and muscle recovery model
-- `src/lib/progression.ts` estimated 1RM, weight suggestions, PRs
+- `src/lib/progression.ts` training max, overload, stall and deload logic, mid-workout adjustment, PRs
+- `src/lib/cardio.ts` cardio types and how they load each muscle
+- `src/components/BodyMap.tsx` the front and back body illustration
 - `src/lib/db.ts` SQLite schema and queries
 - `src/lib/exercises.ts` built-in exercise library
 - `src/lib/theme.ts` colors, type and spacing

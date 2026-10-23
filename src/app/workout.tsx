@@ -18,7 +18,7 @@ import {
   type WorkoutSet,
 } from '../lib/db';
 import { formatClock, formatNumber, MUSCLE_LABELS } from '../lib/format';
-import { estimate1RM, personalRecords } from '../lib/progression';
+import { adjustNextSet, estimate1RM, personalRecords } from '../lib/progression';
 import { colors, radius, space, TAP, type } from '../lib/theme';
 import type { Exercise, Settings } from '../lib/types';
 
@@ -47,6 +47,8 @@ export default function WorkoutScreen() {
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const [summary, setSummary] = useState<Summary | null>(null);
+  // A short note on the rest bar, e.g. when the next sets were auto-adjusted.
+  const [restNote, setRestNote] = useState<string | null>(null);
   const startedAt = useRef(Date.now());
 
   const reload = async (id: number) => setSets(await loadWorkoutSets(db, id));
@@ -120,10 +122,39 @@ export default function WorkoutScreen() {
       } else {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
+      setRestNote(await autoAdjust(set));
       setRestEndsAt(Date.now() + set.restSeconds * 1000);
       setNow(Date.now());
     }
     await reload(workoutId!);
+  };
+
+  /**
+   * Re-weights the remaining sets of this exercise from how the set just went.
+   * Sets with no weight yet (a new lift) inherit the weight just used.
+   */
+  const autoAdjust = async (set: WorkoutSet): Promise<string | null> => {
+    if (set.weight == null || set.reps == null) return null;
+    const increment = settings?.units === 'kg' ? 2.5 : 5;
+    const next =
+      set.targetReps != null && set.targetRir != null
+        ? adjustNextSet({ weight: set.weight, reps: set.reps, rir: set.rir }, set.targetReps, set.targetRir, increment)
+        : null;
+    // Only touch sets still at the planned weight (or empty), so manual edits stick.
+    const later = sets.filter(
+      (s) =>
+        s.exerciseId === set.exerciseId &&
+        s.position > set.position &&
+        !s.completedAt &&
+        (s.weight == null || s.weight === set.weight),
+    );
+    if (later.length === 0) return null;
+    for (const s of later) await updateSet(db, s.id, { weight: next ?? set.weight });
+    if (next == null) return null;
+    const units = settings?.units ?? 'lb';
+    return next > set.weight
+      ? `That looked easy. Next sets bumped to ${next} ${units}.`
+      : `That was tough. Next sets lowered to ${next} ${units}.`;
   };
 
   const finish = () => {
@@ -239,9 +270,12 @@ export default function WorkoutScreen() {
 
       {restEndsAt != null && (
         <View style={[styles.rest, { paddingBottom: insets.bottom + space.sm }]}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={type.label}>REST</Text>
             <Text style={[type.number, { fontSize: 34 }]}>{formatClock(restLeft)}</Text>
+            {restNote && (
+              <Text style={[styles.restNote, !restNote.startsWith('That looked') && { color: colors.warning }]}>{restNote}</Text>
+            )}
           </View>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Button title="+30s" variant="secondary" onPress={() => setRestEndsAt((t) => (t ?? Date.now()) + 30000)} />
@@ -371,6 +405,7 @@ const styles = StyleSheet.create({
   },
   checkText: { color: colors.text, fontSize: 22, fontWeight: '800' },
   addSet: { color: colors.accent, fontSize: 16, fontWeight: '600', paddingVertical: space.sm, textAlign: 'center' },
+  restNote: { color: colors.success, fontSize: 13, fontWeight: '600', marginTop: 2, marginRight: space.sm },
   rest: {
     position: 'absolute',
     left: 0,

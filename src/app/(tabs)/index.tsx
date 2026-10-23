@@ -8,7 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { SectionLabel } from '../../components/ui';
-import { activeWorkoutId, loadExercises, loadHistory, loadSettings, startWorkout } from '../../lib/db';
+import { CARDIO_BY_TYPE, cardioFatigue, type CardioSession } from '../../lib/cardio';
+import { activeWorkoutId, loadCardio, loadExercises, loadHistory, loadSettings, startWorkout } from '../../lib/db';
 import { MUSCLE_LABELS } from '../../lib/format';
 import { generateWorkout, type GeneratedWorkout } from '../../lib/generator';
 import { colors, radius, space, TAP, type } from '../../lib/theme';
@@ -21,6 +22,7 @@ interface TodayData {
   settings: Settings;
   activeId: number | null;
   weekSessions: number;
+  lastCardio: CardioSession | null;
 }
 
 const GOAL_LABEL = { strength: 'Strength', hypertrophy: 'Muscle', endurance: 'Endurance' };
@@ -31,29 +33,32 @@ export default function TodayScreen() {
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
   const [data] = useFocusData<TodayData>(async () => {
-    const [exercises, history, settings, activeId] = await Promise.all([
+    const [exercises, history, settings, activeId, cardio] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadSettings(db),
       activeWorkoutId(db),
+      loadCardio(db, 7),
     ]);
     const weekAgo = Date.now() - 7 * 864e5;
-    const weekSessions = new Set(
-      history.filter((s) => new Date(s.completedAt).getTime() >= weekAgo).map((s) => s.completedAt.slice(0, 10)),
-    ).size;
+    const weekSessions = new Set([
+      ...history.filter((s) => new Date(s.completedAt).getTime() >= weekAgo).map((s) => s.completedAt.slice(0, 10)),
+      ...cardio.map((c) => c.startedAt.slice(0, 10)),
+    ]).size;
     // Leave out a different slice of the library each time the user asks for another plan.
     const rotated = seed === 0 ? exercises : exercises.filter((_, i) => (i + seed) % 4 !== 0);
     return {
-      workout: generateWorkout(rotated, history, settings),
+      workout: generateWorkout(rotated, history, settings, new Date(), cardioFatigue(cardio)),
       exercises: new Map(exercises.map((e) => [e.id, e])),
       settings,
       activeId,
       weekSessions,
+      lastCardio: cardio[0] ?? null,
     };
   }, [seed]);
 
   if (!data) return <View style={styles.screen} />;
-  const { workout, exercises, settings, activeId, weekSessions } = data;
+  const { workout, exercises, settings, activeId, weekSessions, lastCardio } = data;
   const totalSets = workout.exercises.reduce((n, p) => n + p.sets, 0);
   const fresh = [...ALL_MUSCLES].sort((a, b) => workout.recovery[b] - workout.recovery[a]);
 
@@ -118,11 +123,33 @@ export default function TodayScreen() {
                 {p.suggestedWeight != null ? ` · ${p.suggestedWeight} ${settings.units}` : e.equipment === 'bodyweight' ? ' · bodyweight' : ''}
                 {p.suggestedWeight == null && e.equipment !== 'bodyweight' && <Text style={styles.rowNew}> · new lift</Text>}
               </Text>
+              {p.deload ? (
+                <Text style={[styles.badge, { color: colors.warning }]}>Deload: stalled lately, lighter today to rebound</Text>
+              ) : p.change != null && p.change > 0 ? (
+                <Text style={[styles.badge, { color: colors.success }]}>
+                  ▲ {p.change} {settings.units} from last time
+                </Text>
+              ) : null}
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
         );
       })}
+
+      <Pressable onPress={() => router.push('/cardio')} style={({ pressed }) => [styles.cardioCard, pressed && { opacity: 0.8 }]}>
+        <View style={styles.cardioIcon}>
+          <Ionicons name="pulse" size={24} color={colors.accent} />
+        </View>
+        <View style={{ flex: 1, marginLeft: space.md }}>
+          <Text style={styles.rowTitle}>Log cardio</Text>
+          <Text style={styles.rowMeta}>
+            {lastCardio
+              ? `Last: ${CARDIO_BY_TYPE.get(lastCardio.type)?.label} · ${Math.round(lastCardio.minutes)} min`
+              : 'Runs, rides, rowing and intervals count toward recovery'}
+          </Text>
+        </View>
+        <Ionicons name="add-circle" size={28} color={colors.accent} />
+      </Pressable>
 
       <SectionLabel>Muscle recovery</SectionLabel>
       <View style={styles.card}>
@@ -156,7 +183,7 @@ export default function TodayScreen() {
           <Text style={styles.rowTitle}>
             {weekSessions} {weekSessions === 1 ? 'workout' : 'workouts'} this week
           </Text>
-          <Text style={styles.rowMeta}>Recovery is based on your last 72 hours of training.</Text>
+          <Text style={styles.rowMeta}>Recovery uses your last 72 hours of lifting and cardio.</Text>
         </View>
       </View>
     </ScrollView>
@@ -228,6 +255,7 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   rowMeta: { color: colors.textMuted, fontSize: 14, marginTop: 3 },
   rowNew: { color: colors.warning },
+  badge: { fontSize: 13, fontWeight: '700', marginTop: 3 },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.md },
   sideLabels: { flexDirection: 'row', justifyContent: 'space-around', width: 240, marginTop: space.xs },
   legend: { flexDirection: 'row', justifyContent: 'center', gap: space.md, marginTop: space.md },
@@ -243,5 +271,21 @@ const styles = StyleSheet.create({
   },
   chipText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  cardioCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: space.md,
+    marginTop: space.sm,
+  },
+  cardioIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,90,31,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   weekCard: { flexDirection: 'row', alignItems: 'center', marginTop: space.md },
 });

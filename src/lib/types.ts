@@ -53,6 +53,10 @@ export interface PlannedExercise {
   targetRir: number;
   suggestedWeight: number | null;
   restSeconds: number;
+  status: 'new' | 'progressing' | 'stalled';
+  deload: boolean;
+  /** Weight change from last session, or null for a new lift. */
+  change: number | null;
 }
 
 export const ALL_MUSCLES: Muscle[] = [
