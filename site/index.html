@@ -94,6 +94,14 @@
       <p class="code-note">Weights are picked from your own history in the app. New to LiftLab? Install it, then come back and tap this button.</p>
     </section>
 
+    <section class="workout" id="plan" hidden aria-labelledby="plan-count">
+      <div class="code-label">Training plan</div>
+      <h2 id="plan-count" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
+      <ol id="plan-days"></ol>
+      <a class="button open" id="open-plan" href="#">Follow in LiftLab</a>
+      <p class="code-note">Days go in order, one per session, with weights from your own history. New to LiftLab? Install it, then come back and tap this button.</p>
+    </section>
+
     <section class="workout" id="challenge" hidden aria-labelledby="challenge-rules">
       <div class="code-label">Challenge</div>
       <h2 id="challenge-rules" style="margin: 6px 0 0; font-size: 26px; font-weight: 900;"></h2>
@@ -176,6 +184,44 @@
         $('challenge').hidden = false;
       }
 
+      // A plan (?p=...): same format as src/lib/planLink.ts.
+      var plan = !workout && !challenge ? decodePlan(params.get('p')) : null;
+      if (plan) {
+        document.title = plan.title + ' · LiftLab plan';
+        $('eyebrow').textContent = 'Follow this plan';
+        $('headline').textContent = plan.title;
+        $('plan-count').textContent = plan.days.length + (plan.days.length === 1 ? ' day' : ' days');
+        plan.days.forEach(function (d, i) {
+          var li = document.createElement('li');
+          var name = document.createElement('span');
+          name.className = 'lift';
+          name.textContent = (i + 1) + '. ' + d.title;
+          var info = document.createElement('span');
+          info.className = 'sets';
+          info.textContent = d.lifts.length + (d.lifts.length === 1 ? ' lift' : ' lifts');
+          li.title = d.lifts.map(function (l) { return l.name; }).join(', ');
+          li.appendChild(name);
+          li.appendChild(info);
+          $('plan-days').appendChild(li);
+        });
+        $('open-plan').href = 'liftlab://plan?p=' + params.get('p');
+        $('plan').hidden = false;
+      }
+
+      function decodePlan(p) {
+        var raw = decodeJson(p, 12000);
+        if (!Array.isArray(raw) || raw[0] !== 1 || !Array.isArray(raw[2]) || !raw[2].length) return null;
+        var days = [];
+        for (var i = 0; i < Math.min(raw[2].length, 7); i++) {
+          var d = raw[2][i];
+          var w = Array.isArray(d) ? decodeWorkout(null, [1, d[0], d[1]]) : null;
+          if (!w) return null;
+          days.push({ title: (typeof d[0] === 'string' && d[0].trim().slice(0, 40)) || 'Day ' + (i + 1), lifts: w.lifts });
+        }
+        var title = (typeof raw[1] === 'string' && raw[1].trim().slice(0, 40)) || days.length + '-day plan';
+        return { title: title, days: days };
+      }
+
       function decodeJson(s, max) {
         if (!s || !/^[A-Za-z0-9_-]+$/.test(s) || s.length > max) return null;
         try {
@@ -199,8 +245,8 @@
         return { title: title, sessions: sessions, days: days };
       }
 
-      function decodeWorkout(w) {
-        var raw = decodeJson(w, 4000);
+      function decodeWorkout(w, parsed) {
+        var raw = parsed || decodeJson(w, 4000);
         try {
           if (!Array.isArray(raw) || raw[0] !== 1 || !Array.isArray(raw[2])) return null;
           var lifts = raw[2].slice(0, 15).filter(function (l) {
@@ -218,6 +264,7 @@
       $('code-card').hidden = false;
       if (workout) $('open-app').href += '&code=' + code;
       else if (challenge) $('open-challenge').href += '&code=' + code;
+      else if (plan) $('open-plan').href += '&code=' + code;
       else $('eyebrow').textContent = 'You’re invited';
 
       function copy() {
@@ -236,8 +283,8 @@
             return;
           }
           var name = r.body.creatorName;
-          if (workout || challenge) {
-            $('eyebrow').textContent = name + (workout ? '’s workout' : '’s challenge');
+          if (workout || challenge || plan) {
+            $('eyebrow').textContent = name + (workout ? '’s workout' : challenge ? '’s challenge' : '’s plan');
           } else {
             document.title = name + ' invited you to LiftLab';
             $('eyebrow').textContent = name + ' invited you';

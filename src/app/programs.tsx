@@ -7,7 +7,9 @@ import { MUSCLE_LABELS } from '../lib/format';
 import { PROGRAMS, programStep, type Program } from '../lib/programs';
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
+import { stopFollowing } from '../services/plan';
 import { loadProgram, startProgram, stopProgram } from '../services/programs';
+import { router } from 'expo-router';
 
 const LEVEL_COLOR = { Beginner: colors.success, Intermediate: colors.warning, Advanced: colors.danger };
 
@@ -19,6 +21,8 @@ export default function ProgramsScreen() {
 
   const start = (p: Program) => {
     const run = async () => {
+      // A program replaces a followed plan, since both decide what you train next.
+      await stopFollowing(db);
       await startProgram(db, p.id);
       reload();
     };
@@ -41,6 +45,18 @@ export default function ProgramsScreen() {
         A program sets what you train each session. Exercises and weights still adapt to your recovery, equipment and progress.
         Miss a day and it simply picks up where you left off.
       </Text>
+      <Pressable
+        onPress={() => router.push('/plan-new')}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.card, styles.makeRow, pressed && { opacity: 0.85 }]}
+      >
+        <Icon name="share" size={22} color={colors.accent} />
+        <View style={{ flex: 1 }}>
+          <Text style={[type.body, { fontWeight: '700' }]}>Make your own plan</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 2 }}>Turn your workouts into a plan your followers can follow</Text>
+        </View>
+        <Icon name="chevron" size={14} color={colors.textMuted} />
+      </Pressable>
       {PROGRAMS.map((p) => {
         const current = step?.program.id === p.id ? step : null;
         return (
@@ -96,6 +112,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, marginBottom: space.md, borderWidth: 1, borderColor: 'transparent' },
   current: { borderColor: colors.accent },
+  makeRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   level: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: space.xs },

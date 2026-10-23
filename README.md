@@ -170,6 +170,13 @@ workout rides inside the link (`?w=…`, see `src/lib/workoutLink.ts`), so no se
   Custom lifts the follower doesn't have are matched by name, or skipped with a note.
 - The landing page address comes from `EXPO_PUBLIC_SITE_URL` (defaults to the GitHub Pages site).
 
+## Creator plans
+
+Programs → **Make your own plan** turns past workouts into a plan of up to 7 days and shares it as one
+link (`?p=…`, see `src/lib/planLink.ts`). Followers tap **Follow** and Today shows the next day with a
+Start button; finishing it moves the plan on, wrapping back to day 1. Following a plan replaces a
+built-in program and the other way round. Like workout links, the whole plan rides in the link.
+
 ## Challenges
 
 Today → **Start a challenge** sets a goal like 12 training days in 4 weeks (`src/lib/challenge.ts`).

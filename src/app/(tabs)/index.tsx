@@ -21,11 +21,14 @@ import { needsOnboarding } from '../../lib/onboarding';
 import { deloadWorkout, programStep, type ProgramStep } from '../../lib/programs';
 import { weekProgress, type Badge, type WeekProgress } from '../../lib/habits';
 import { colors, radius, space, TAP, type } from '../../lib/theme';
-import { ALL_MUSCLES, type Exercise, type Settings } from '../../lib/types';
+import { ALL_MUSCLES, type Exercise, type PlannedExercise, type Settings } from '../../lib/types';
 import { useFocusData } from '../../lib/useData';
 import { checkBadges, loadSessionDates } from '../../services/habits';
 import { loadProgram, rememberProgramWorkout } from '../../services/programs';
 import { loadSaved } from '../../services/savedWorkouts';
+import { loadPlan, rememberPlanWorkout } from '../../services/plan';
+import type { FollowedPlan } from '../../lib/planLink';
+import { planFromLink } from '../../lib/workoutLink';
 import { loadChallenge } from '../../services/challenge';
 import { challengeProgress, type ChallengeProgress, type JoinedChallenge } from '../../lib/challenge';
 import { syncReminders } from '../../services/reminders';
@@ -44,6 +47,7 @@ interface TodayData {
   eaten: Macros;
   targets: Macros;
   savedCount: number;
+  plan: { followed: FollowedPlan; next: PlannedExercise[] } | null;
   challenge: { def: JoinedChallenge; progress: ChallengeProgress } | null;
 }
 
@@ -55,7 +59,7 @@ export default function TodayScreen() {
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
   const [data, reload] = useFocusData<TodayData>(async () => {
-    const [exercises, history, settings, activeId, cardio, food, sessionDates, program, saved, challenge] = await Promise.all([
+    const [exercises, history, settings, activeId, cardio, food, sessionDates, program, saved, challenge, plan] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadSettings(db),
@@ -66,6 +70,7 @@ export default function TodayScreen() {
       loadProgram(db),
       loadSaved(db),
       loadChallenge(db),
+      loadPlan(db),
     ]);
     const badges = await checkBadges(db, settings.weeklyGoal);
     // Re-plan reminders whenever Today opens, so they reflect what's been done.
@@ -89,6 +94,9 @@ export default function TodayScreen() {
       eaten: sumMacros(food),
       targets: dailyTargets(settings.bodyWeightKg, settings.nutritionGoal, settings.goal),
       savedCount: saved.length,
+      plan: plan
+        ? { followed: plan, next: planFromLink(plan.days[plan.next], exercises, history, settings.units === 'kg' ? 2.5 : 5).plan }
+        : null,
       challenge: challenge ? { def: challenge, progress: challengeProgress(challenge, sessionDates, new Date()) } : null,
     };
   }, [seed]);
@@ -105,6 +113,14 @@ export default function TodayScreen() {
   const totalSets = workout.exercises.reduce((n, p) => n + p.sets, 0);
   const following = data.step && !data.step.finished ? data.step : null;
   const fresh = [...ALL_MUSCLES].sort((a, b) => workout.recovery[b] - workout.recovery[a]);
+
+  const beginPlan = async () => {
+    if (activeId == null && data.plan) {
+      const id = await startWorkout(db, data.plan.next);
+      await rememberPlanWorkout(db, id);
+    }
+    router.push('/workout');
+  };
 
   const begin = async () => {
     if (activeId == null) {
@@ -123,6 +139,29 @@ export default function TodayScreen() {
 
       <GoalCard progress={data.week} fresh={data.freshBadges} />
 
+      {data.plan && (
+        <View style={styles.planCard}>
+          <Pressable onPress={() => router.push('/plan')} accessibilityRole="button" accessibilityHint="Shows the whole plan">
+            <Text style={styles.planEyebrow}>{data.plan.followed.title.toUpperCase()}</Text>
+            <Text style={styles.planTitle}>
+              Up next: {data.plan.followed.days[data.plan.followed.next].title}
+            </Text>
+            <Text style={styles.rowMeta}>
+              Day {data.plan.followed.next + 1} of {data.plan.followed.days.length} · {data.plan.next.length}{' '}
+              {data.plan.next.length === 1 ? 'lift' : 'lifts'} · {data.plan.next.reduce((n, p) => n + p.sets, 0)} sets
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={beginPlan}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.planStart, pressed && { opacity: 0.85 }]}
+          >
+            <Icon name="play" size={18} color={colors.accentText} />
+            <Text style={styles.planStartText}>{activeId != null ? 'Resume workout' : 'Start'}</Text>
+          </Pressable>
+        </View>
+      )}
+
       <CoachPlanCard activeId={activeId} />
 
       <LinearGradient colors={['#FF6A2B', '#E5341B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
@@ -133,7 +172,9 @@ export default function TodayScreen() {
                 ? 'IN PROGRESS'
                 : following
                   ? `${following.program.name.toUpperCase()} · WEEK ${following.week}${following.deload ? ' · DELOAD' : ''}`
-                  : 'RECOMMENDED WORKOUT'}
+                  : data.plan
+                    ? 'OR TRAIN WHAT’S RECOVERED'
+                    : 'RECOMMENDED WORKOUT'}
             </Text>
             <Text style={styles.heroTitle}>{following && activeId == null ? following.day.name : workout.focus.slice(0, 3).map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
             {following && activeId == null && (
@@ -371,6 +412,11 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  planCard: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, padding: space.md, marginBottom: space.md, gap: space.md },
+  planEyebrow: { ...type.label, color: colors.accent },
+  planTitle: { color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 4 },
+  planStart: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, minHeight: 52, borderRadius: radius.md, backgroundColor: colors.accent },
+  planStartText: { color: colors.accentText, fontSize: 17, fontWeight: '800' },
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: space.md, paddingBottom: space.xl * 2 },
   hero: { borderRadius: radius.lg, padding: space.lg },

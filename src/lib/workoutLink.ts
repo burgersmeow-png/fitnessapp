@@ -58,9 +58,7 @@ const clamp = (n: unknown, lo: number, hi: number) => (typeof n === 'number' && 
 const cleanText = (s: unknown, max: number) => (typeof s === 'string' ? s.replace(/[\u0000-\u001f]/g, '').trim().slice(0, max) : '');
 
 export function encodeWorkoutLink(w: WorkoutLink): string {
-  return toBase64Url(
-    JSON.stringify([LINK_VERSION, cleanText(w.title, TITLE_MAX), w.lifts.slice(0, MAX_LIFTS).map((l) => [l.id, l.name, l.sets, l.reps, l.rest])]),
-  );
+  return toBase64Url(JSON.stringify([LINK_VERSION, ...packWorkout(w)]));
 }
 
 /** null for anything that isn't a well-formed link. Numbers are clamped to sane ranges. */
@@ -74,9 +72,15 @@ export function decodeWorkoutLink(payload: string | null | undefined): WorkoutLi
   } catch {
     return null;
   }
-  if (!Array.isArray(raw) || raw[0] !== LINK_VERSION || !Array.isArray(raw[2])) return null;
+  if (!Array.isArray(raw) || raw[0] !== LINK_VERSION) return null;
+  return cleanWorkout(raw[1], raw[2]);
+}
+
+/** A workout's title and lifts from parsed link data, or null if anything is off. Numbers are clamped. */
+export function cleanWorkout(rawTitle: unknown, rawLifts: unknown): WorkoutLink | null {
+  if (!Array.isArray(rawLifts)) return null;
   const lifts: LinkedLift[] = [];
-  for (const l of raw[2].slice(0, MAX_LIFTS)) {
+  for (const l of rawLifts.slice(0, MAX_LIFTS)) {
     if (!Array.isArray(l)) return null;
     const id = cleanText(l[0], 60);
     const name = cleanText(l[1], 60);
@@ -87,8 +91,11 @@ export function decodeWorkoutLink(payload: string | null | undefined): WorkoutLi
     lifts.push({ id, name, sets, reps, rest });
   }
   if (lifts.length === 0) return null;
-  return { title: cleanText(raw[1], TITLE_MAX) || 'Shared workout', lifts };
+  return { title: cleanText(rawTitle, TITLE_MAX) || 'Shared workout', lifts };
 }
+
+/** A workout as plain arrays, the shape links carry. */
+export const packWorkout = (w: WorkoutLink) => [cleanText(w.title, TITLE_MAX), w.lifts.slice(0, MAX_LIFTS).map((l) => [l.id, l.name, l.sets, l.reps, l.rest])];
 
 /** Reads ?w= from an app or web link. */
 export function workoutFromUrl(url: string | null | undefined): WorkoutLink | null {
