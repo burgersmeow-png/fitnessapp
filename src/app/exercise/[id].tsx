@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BodyMap, type MuscleFills } from '../../components/BodyMap';
 import { ExerciseDemo } from '../../components/ExerciseDemo';
-import { Button, Card, SectionLabel, Loading } from '../../components/ui';
+import { Button, Card, Chip, SectionLabel, Loading } from '../../components/ui';
 import { confirm } from '../../components/confirm';
 import { deleteCustomExercise, loadExercises, loadHistory, loadSettings } from '../../lib/db';
 import { formatDate, MUSCLE_LABELS } from '../../lib/format';
@@ -14,13 +14,15 @@ import { colors, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
 import { LiftNote } from '../../components/LiftNote';
 import { loadNotes, saveNote } from '../../services/notes';
+import { loadPrefs, savePref } from '../../services/exercisePrefs';
+import type { ExercisePref } from '../../lib/exercisePrefs';
 
 export default function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
   const [blocked, setBlocked] = useState(false);
   const [data, reload] = useFocusData(async () => {
-    const [exercises, history, settings, notes] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), loadNotes(db)]);
+    const [exercises, history, settings, notes, prefs] = await Promise.all([loadExercises(db), loadHistory(db), loadSettings(db), loadNotes(db), loadPrefs(db)]);
     const sets = history.filter((s) => s.exerciseId === id);
     // Best estimated 1RM per training day, oldest first.
     const byDay = new Map<string, { e1rm: number; weight: number; reps: number }>();
@@ -30,11 +32,15 @@ export default function ExerciseScreen() {
       if (!byDay.has(day) || e1rm > byDay.get(day)!.e1rm) byDay.set(day, { e1rm, weight: s.weight, reps: s.reps });
     }
     const sessions = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, ...v }));
-    return { exercise: exercises.find((e) => e.id === id), sessions, units: settings.units, note: notes[id] };
+    return { exercise: exercises.find((e) => e.id === id), sessions, units: settings.units, note: notes[id], pref: prefs[id] ?? null };
   }, [id]);
 
   if (!data?.exercise) return <Loading />;
-  const { exercise, sessions, units, note } = data;
+  const { exercise, sessions, units, note, pref } = data;
+  const choose = async (p: ExercisePref) => {
+    await savePref(db, exercise.id, pref === p ? null : p);
+    reload();
+  };
   const best = Math.max(0, ...sessions.map((s) => s.e1rm));
   const recent = sessions.slice(-12);
   const steps = EXERCISE_GUIDE[exercise.id] ?? [];
@@ -48,6 +54,17 @@ export default function ExerciseScreen() {
       <Text style={[type.body, { color: colors.textMuted, marginTop: space.xs, textTransform: 'capitalize' }]}>
         {[...exercise.primary, ...exercise.secondary].map((m) => MUSCLE_LABELS[m]).join(', ')} · {exercise.equipment}
       </Text>
+      <View style={styles.prefRow}>
+        <Chip label="Suggest more" selected={pref === 'more'} onPress={() => choose('more')} />
+        <Chip label="Don’t suggest" selected={pref === 'never'} onPress={() => choose('never')} />
+      </View>
+      {pref && (
+        <Text style={styles.prefNote}>
+          {pref === 'more'
+            ? 'Planned workouts bring this lift back round sooner.'
+            : 'Planned workouts leave this out. You can still add it to a workout yourself.'}
+        </Text>
+      )}
 
       <View style={{ marginTop: space.md }}>
         <LiftNote
@@ -145,6 +162,8 @@ export default function ExerciseScreen() {
 }
 
 const styles = StyleSheet.create({
+  prefRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: space.md },
+  prefNote: { color: colors.textMuted, fontSize: 14, marginTop: space.xs },
   screen: { flex: 1, backgroundColor: colors.background },
   chart: { flexDirection: 'row', alignItems: 'flex-end', height: 120, marginTop: space.md, gap: 6 },
   barSlot: { flex: 1, maxWidth: 28, height: '100%', justifyContent: 'flex-end' },

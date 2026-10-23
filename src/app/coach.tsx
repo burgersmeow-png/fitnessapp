@@ -1,5 +1,7 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import type { ExercisePrefs } from '../lib/exercisePrefs';
+import { loadPrefs } from '../services/exercisePrefs';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +20,7 @@ import { EXAMPLES, parseCommand } from '../lib/voice';
 import { say } from '../services/speech';
 
 interface CoachData {
+  prefs: ExercisePrefs;
   exercises: Exercise[];
   byId: Map<string, Exercise>;
   history: Awaited<ReturnType<typeof loadHistory>>;
@@ -33,14 +36,15 @@ export default function CoachScreen() {
   const [reply, setReply] = useState<string | null>(null);
   const [plan, setPlan] = useState<{ workout: GeneratedWorkout; title: string; minutes: number } | null>(null);
   const [data] = useFocusData<CoachData>(async () => {
-    const [exercises, history, cardio, settings, activeId] = await Promise.all([
+    const [exercises, history, cardio, settings, activeId, prefs] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadCardio(db, 7),
       loadSettings(db),
       activeWorkoutId(db),
+      loadPrefs(db),
     ]);
-    return { exercises, byId: new Map(exercises.map((e) => [e.id, e])), history, cardio, settings, activeId };
+    return { exercises, byId: new Map(exercises.map((e) => [e.id, e])), history, cardio, settings, activeId, prefs };
   }, []);
 
   if (!data) return <Loading />;
@@ -62,7 +66,7 @@ export default function CoachScreen() {
       equipment: cmd.equipment ?? data.settings.equipment,
       goal: cmd.goal ?? data.settings.goal,
     };
-    const workout = generateWorkout(data.exercises, data.history, settings, new Date(), cardioFatigue(data.cardio), cmd.focus);
+    const workout = generateWorkout(data.exercises, data.history, settings, new Date(), cardioFatigue(data.cardio), cmd.focus, data.prefs);
     if (workout.exercises.length === 0) {
       setPlan(null);
       respond('I couldn’t find exercises for that equipment. Try another, or check your equipment in Settings.');
