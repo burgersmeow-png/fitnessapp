@@ -9,7 +9,7 @@ const INSTALL = 'install-id';
 export const creatorCodesAvailable = () => !!SERVER_URL;
 export const loadCreator = (db: SQLiteDatabase) => loadRecord<CreatorState>(db, STATE);
 
-async function installId(db: SQLiteDatabase): Promise<string> {
+export async function installId(db: SQLiteDatabase): Promise<string> {
   const existing = await loadRecord<string>(db, INSTALL);
   if (existing) return existing;
   const id = newInstallId();

@@ -160,6 +160,8 @@
               if (!r.ok) { status.className = 'note error'; status.textContent = r.body.error || 'Couldn’t save. Try again.'; return; }
               $('pins').value = r.body.pins.map(pinUrl).join('\n');
               status.textContent = r.body.pins.length ? 'Saved. Your page shows ' + r.body.pins.length + (r.body.pins.length === 1 ? ' link.' : ' links.') : 'Saved. Your page shows no pinned links.';
+              if (r.body.notified) status.textContent += ' ' + r.body.notified + (r.body.notified === 1 ? ' follower was' : ' followers were') + ' told about what’s new.';
+              else if (r.body.alertedRecently) status.textContent += ' Followers were already alerted in the last 12 hours, so this one shows quietly in their app.';
             })
             .catch(function () { status.className = 'note error'; status.textContent = 'Couldn’t reach LiftLab. Try again.'; });
         });

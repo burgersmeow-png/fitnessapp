@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dailyCounts, dailyOpens, parseClaim, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
+import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePushRequest, pinAlert, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
 
 test('claims need a real code and install id', () => {
   const installId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -75,4 +75,25 @@ test('link opens are summed per day, old days dropped', () => {
   assert.equal(d[13].count, 40);
   assert.equal(d[10].count, 7);
   assert.equal(d.reduce((n, x) => n + x.count, 0), 47);
+});
+
+test('push sign-ups need an install id and an Expo token', () => {
+  const installId = 'abcdef0123456789';
+  assert.deepEqual(parsePushRequest({ installId, token: 'ExponentPushToken[xyz]' }), { installId, token: 'ExponentPushToken[xyz]' });
+  assert.equal(parsePushRequest({ installId, token: 'https://evil' }), null);
+  assert.equal(parsePushRequest({ installId: 'short', token: 'ExpoPushToken[xyz]' }), null);
+});
+
+test('followers hear about new pins only, at most twice a day', () => {
+  const a = { kind: 'w' as const, payload: 'aaaaaaaa', title: 'Leg day' };
+  const b = { kind: 'p' as const, payload: 'bbbbbbbb', title: 'Split' };
+  assert.deepEqual(newPins([a], [b, a]), [b]);
+  assert.deepEqual(newPins([a, b], [a]), []);
+  const now = new Date('2026-10-23T12:00:00Z');
+  assert.equal(canAlert(null, now), true);
+  assert.equal(canAlert('2026-10-23T06:00:00Z', now), false);
+  assert.equal(canAlert('2026-10-22T23:00:00Z', now), true);
+  assert.deepEqual(pinAlert('Alex', [b]), { title: 'Alex posted a new plan', body: 'Split', data: { kind: 'creator', path: '/plan', params: { p: 'bbbbbbbb' } } });
+  assert.equal(pinAlert('Alex', [a, b]).title, 'Alex posted 2 new things');
+  assert.deepEqual(chunks([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
 });
