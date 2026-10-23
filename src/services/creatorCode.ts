@@ -91,3 +91,13 @@ export async function creditFromLink(db: SQLiteDatabase, raw: string | null | un
     return null;
   }
 }
+
+/**
+ * Tells the server this follower started something from a link (the link's data), so their
+ * creator's dashboard can count it if it's pinned. Fire and forget.
+ */
+export async function reportPinUse(db: SQLiteDatabase, payload: string | undefined): Promise<void> {
+  if (!payload || !SERVER_URL || !(await loadCreator(db))) return;
+  await flushCreator(db);
+  await post('/ref/used', { installId: await installId(db), payload });
+}

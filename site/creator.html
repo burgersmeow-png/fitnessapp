@@ -49,6 +49,11 @@
     .link { flex: 1; min-width: 0; background: var(--surface-raised); border-radius: 12px; padding: 12px; font-size: 14px; overflow-wrap: anywhere; }
     button { font: inherit; font-weight: 800; border: 0; border-radius: 12px; min-height: 44px; padding: 0 16px; background: var(--surface-raised); color: var(--text); cursor: pointer; flex-shrink: 0; }
     textarea { width: 100%; margin-top: 12px; background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 12px; font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+    .uses { list-style: none; padding: 0; margin: 12px 0 0; }
+    .uses li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); margin: 0; color: var(--text); }
+    .uses li:first-child { border-top: 0; }
+    .uses .t { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+    .uses .n { color: var(--text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
     button.primary { background: var(--accent); color: #fff; }
     #view-page { margin: 0; color: var(--text); font-weight: 700; }
     ul { margin: 12px 0 0; padding-left: 20px; color: var(--text-muted); font-size: 15px; }
@@ -85,6 +90,7 @@
       <section aria-labelledby="pins-title">
         <h2 id="pins-title">Your page</h2>
         <p class="note">Followers who open your link see these, in this order. Paste up to 6 workout, plan or challenge links from the app, one per line.</p>
+        <ul class="uses" id="pin-uses" aria-label="How many followers started each pin" hidden></ul>
         <label class="sr" for="pins">Pinned links, one per line</label>
         <textarea id="pins" rows="6" spellcheck="false" placeholder="https://…/?w=…"></textarea>
         <div class="row"><button type="button" id="save-pins" class="primary">Save my page</button><a class="note" id="view-page" target="_blank" rel="noopener">See it</a></div>
@@ -148,6 +154,30 @@
 
         var api = cfg.serverUrl.replace(/\/$/, '');
         var pinUrl = function (p) { return site + '?' + p.kind + '=' + p.payload; };
+        // Followers who started each pin, kept across saves by the pin's data.
+        var uses = {};
+        var kindWord = { w: 'Workout', p: 'Plan', c: 'Challenge' };
+        var verb = { w: 'started', p: 'following', c: 'joined' };
+        var showUses = function (pins) {
+          var list = $('pin-uses');
+          list.textContent = '';
+          pins.forEach(function (p) {
+            if (typeof p.uses === 'number') uses[p.payload] = p.uses;
+            var n = uses[p.payload] || 0;
+            var li = document.createElement('li');
+            var t = document.createElement('span');
+            t.className = 't';
+            t.textContent = kindWord[p.kind] + ' · ' + p.title;
+            var c = document.createElement('span');
+            c.className = 'n';
+            c.textContent = n + ' ' + verb[p.kind];
+            li.appendChild(t);
+            li.appendChild(c);
+            list.appendChild(li);
+          });
+          list.hidden = !pins.length;
+        };
+        showUses(d.pins || []);
         $('pins').value = (d.pins || []).map(pinUrl).join('\n');
         $('view-page').href = link;
         $('save-pins').addEventListener('click', function () {
@@ -159,6 +189,7 @@
             .then(function (r) {
               if (!r.ok) { status.className = 'note error'; status.textContent = r.body.error || 'Couldn’t save. Try again.'; return; }
               $('pins').value = r.body.pins.map(pinUrl).join('\n');
+              showUses(r.body.pins);
               status.textContent = r.body.pins.length ? 'Saved. Your page shows ' + r.body.pins.length + (r.body.pins.length === 1 ? ' link.' : ' links.') : 'Saved. Your page shows no pinned links.';
               if (r.body.notified) status.textContent += ' ' + r.body.notified + (r.body.notified === 1 ? ' follower was' : ' followers were') + ' told about what’s new.';
               else if (r.body.alertedRecently) status.textContent += ' Followers were already alerted in the last 12 hours, so this one shows quietly in their app.';

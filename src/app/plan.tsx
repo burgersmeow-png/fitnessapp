@@ -9,7 +9,7 @@ import { colors, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { loadPlan, startFollowing, stopFollowing } from '../services/plan';
 import { loadProgram, stopProgram } from '../services/programs';
-import { linkWithMyCode } from '../services/creatorCode';
+import { linkWithMyCode, reportPinUse } from '../services/creatorCode';
 import { SITE_URL } from '../services/server';
 import { useLinkCredit } from '../components/useLinkCredit';
 import { shareLink } from '../services/shareLink';
@@ -49,6 +49,7 @@ export default function PlanScreen() {
       // A plan replaces a built-in program, since both decide what you train next.
       if (program) await stopProgram(db);
       await startFollowing(db, plan);
+      if (shared) reportPinUse(db, p).catch(() => {});
       router.replace('/');
     };
     const replacing = followed ? `You’ll stop following ${followed.title}.` : program ? 'You’ll stop your current program.' : null;

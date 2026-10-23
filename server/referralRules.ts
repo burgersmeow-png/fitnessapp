@@ -1,4 +1,5 @@
 // Pure checks for the creator-code routes, kept apart so they can be tested without a database.
+import { createHash } from 'node:crypto';
 
 const CODE = /^[A-Z0-9]{3,20}$/;
 const INSTALL = /^[a-z0-9-]{16,64}$/;
@@ -149,4 +150,21 @@ export function chunks<T>(list: T[], size = 100): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
   return out;
+}
+
+/** A pin's key in creator_pin_uses: the link data hashed, so rows stay small. */
+export const pinHash = (payload: string) => createHash('sha256').update(payload).digest('hex');
+
+/** The app's "I started this" report. */
+export function parseUseRequest(body: unknown): { installId: string; payload: string } | null {
+  const b = body as { installId?: unknown; payload?: unknown } | null;
+  if (!validInstall(b?.installId) || typeof b?.payload !== 'string' || !/^[A-Za-z0-9_-]{8,5000}$/.test(b.payload)) return null;
+  return { installId: b.installId as string, payload: b.payload };
+}
+
+/** Each pin with how many followers used it. */
+export function pinsWithUses(pins: Pin[], rows: { pin_hash: string }[]): (Pin & { uses: number })[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.pin_hash, (counts.get(r.pin_hash) ?? 0) + 1);
+  return pins.map((p) => ({ ...p, uses: counts.get(pinHash(p.payload)) ?? 0 }));
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePushRequest, pinAlert, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
+import { canAlert, chunks, dailyCounts, dailyOpens, newPins, parseClaim, parsePushRequest, parseUseRequest, pinAlert, pinHash, pinsWithUses, parsePinsRequest, pinFromLink, parseStatsRequest, rateLimiter, tokensMatch, validCode } from './referralRules';
 
 test('claims need a real code and install id', () => {
   const installId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
@@ -96,4 +96,14 @@ test('followers hear about new pins only, at most twice a day', () => {
   assert.deepEqual(pinAlert('Alex', [b]), { title: 'Alex posted a new plan', body: 'Split', data: { kind: 'creator', path: '/plan', params: { p: 'bbbbbbbb' } } });
   assert.equal(pinAlert('Alex', [a, b]).title, 'Alex posted 2 new things');
   assert.deepEqual(chunks([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
+});
+
+test('pin uses are counted per pin', () => {
+  const a = { kind: 'w' as const, payload: 'aaaaaaaa', title: 'Leg day' };
+  const b = { kind: 'c' as const, payload: 'bbbbbbbb', title: 'Ten' };
+  assert.match(pinHash('aaaaaaaa'), /^[a-f0-9]{64}$/);
+  const rows = [{ pin_hash: pinHash('aaaaaaaa') }, { pin_hash: pinHash('aaaaaaaa') }, { pin_hash: pinHash('zzzzzzzz') }];
+  assert.deepEqual(pinsWithUses([a, b], rows).map((p) => p.uses), [2, 0]);
+  assert.deepEqual(parseUseRequest({ installId: 'abcdef0123456789', payload: 'aaaaaaaa' }), { installId: 'abcdef0123456789', payload: 'aaaaaaaa' });
+  assert.equal(parseUseRequest({ installId: 'abcdef0123456789', payload: '<b>' }), null);
 });
