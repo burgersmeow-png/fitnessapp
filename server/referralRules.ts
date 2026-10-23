@@ -213,3 +213,14 @@ export function crewBoard(rows: CrewRow[], me: string, size = 10) {
   const mine = placed.find((p) => p.me) ?? null;
   return { top, me: mine, total: placed.filter((p) => p.days > 0).length };
 }
+
+/** A crew member's id on the dashboard: derived from the install id, which never leaves the server. */
+export const crewMemberId = (installId: string) => pinHash(`crew:${installId}`).slice(0, 16);
+
+/** The creator hiding or un-hiding a nickname. */
+export function parseCrewHide(body: unknown): { code: string; token: string; id: string; hidden: boolean } | null {
+  const auth = parseStatsRequest(body);
+  const b = body as { id?: unknown; hidden?: unknown } | null;
+  if (!auth || typeof b?.id !== 'string' || !/^[a-f0-9]{16}$/.test(b.id) || typeof b.hidden !== 'boolean') return null;
+  return { ...auth, id: b.id, hidden: b.hidden };
+}
