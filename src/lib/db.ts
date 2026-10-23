@@ -3,11 +3,12 @@ import type { CardioSession, CardioType } from './cardio';
 import { EXERCISES } from './exercises';
 import type { FoodEntry, FoodItem, Meal } from './nutrition';
 import type { ExportRow } from './exportCsv';
+import { fromCm, toCm, type BodyPart, type Measurement } from './measurements';
 import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export const DATABASE_NAME = 'liftlab.db';
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 /*
  * Units: weights are stored in kilograms and distances in kilometres. They are
@@ -125,6 +126,18 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
         kg REAL NOT NULL
       );
       CREATE INDEX IF NOT EXISTS body_weights_at ON body_weights(measured_at);
+    `);
+  }
+  if (version < 7) {
+    // Tape measurements, always stored in cm.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS body_measurements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        part TEXT NOT NULL,
+        measured_at TEXT NOT NULL,
+        cm REAL NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS body_measurements_part ON body_measurements(part, measured_at);
     `);
   }
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -511,4 +524,21 @@ export async function loadBodyWeights(db: SQLiteDatabase, sinceDays?: number): P
     since,
   );
   return rows.map((r) => ({ id: r.id, measuredAt: r.measured_at, weight: fromKg(r.kg) }));
+}
+
+export async function logMeasurement(db: SQLiteDatabase, part: BodyPart, value: number, at = new Date()): Promise<void> {
+  const cm = Math.round(toCm(value, units) * 10) / 10;
+  await db.runAsync('INSERT INTO body_measurements (part, measured_at, cm) VALUES (?, ?, ?)', part, at.toISOString(), cm);
+}
+
+export async function deleteMeasurement(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM body_measurements WHERE id = ?', id);
+}
+
+/** Every tape measurement, oldest first, in the user's length unit. */
+export async function loadMeasurements(db: SQLiteDatabase): Promise<Measurement[]> {
+  const rows = await db.getAllAsync<{ id: number; part: string; measured_at: string; cm: number }>(
+    'SELECT * FROM body_measurements ORDER BY measured_at',
+  );
+  return rows.map((r) => ({ id: r.id, part: r.part as BodyPart, measuredAt: r.measured_at, value: fromCm(r.cm, units) }));
 }
