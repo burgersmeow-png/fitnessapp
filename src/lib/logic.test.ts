@@ -6,6 +6,7 @@ import { EXERCISE_GUIDE } from './exerciseGuide';
 import { blend, joints, repProgress } from './figure';
 import { exerciseCount, generateWorkout, muscleRecovery } from './generator';
 import { MOTIONS } from './motions';
+import { dailyTargets, mealForTime, normalizeEstimate, scaleItem } from './nutrition';
 import { adjustNextSet, estimate1RM, liftStatus, personalRecords, suggestNext, suggestWeight, trainingMax } from './progression';
 import { DEFAULT_SETTINGS, type LoggedSet } from './types';
 
@@ -145,4 +146,53 @@ test('the demo figure keeps its anchor joint still through the rep', () => {
       assert.ok(Math.abs(p.x - motion.at.x) < 1e-6 && Math.abs(p.y - motion.at.y) < 1e-6, `${id} drifted at ${t}`);
     }
   }
+});
+
+test('daily targets follow body weight and goal', () => {
+  const maintain = dailyTargets(80, 'maintain', 'hypertrophy');
+  assert.equal(maintain.calories, 2650);
+  assert.equal(maintain.protein, 160);
+  assert.equal(maintain.fat, 64);
+  assert.equal(maintain.carbs, Math.round((2650 - 160 * 4 - 64 * 9) / 4));
+  assert.ok(dailyTargets(80, 'lose', 'hypertrophy').calories < maintain.calories);
+  assert.ok(dailyTargets(80, 'gain', 'hypertrophy').calories > maintain.calories);
+  // No body weight yet: falls back to a sensible default rather than zero.
+  assert.ok(dailyTargets(null, 'maintain', 'strength').calories > 2000);
+});
+
+test('photo estimates are validated before they are trusted', () => {
+  const e = normalizeEstimate({
+    items: [
+      { name: ' Grilled chicken ', portion: '150 g', calories: 250, protein_g: 46, carbs_g: 0, fat_g: 5 },
+      // Calories that don't match the macros are recomputed from them.
+      { name: 'Rice', portion: '1 cup', calories: 9999, protein_g: 4, carbs_g: 45, fat_g: 0.5 },
+      { name: '', calories: 100 },
+      'nonsense',
+    ],
+    confidence: 'certain',
+  });
+  assert.equal(e.items.length, 2);
+  assert.equal(e.items[0].name, 'Grilled chicken');
+  assert.equal(e.items[1].calories, Math.round(4 * 4 + 45 * 4 + 0.5 * 9));
+  assert.equal(e.confidence, 'medium');
+  assert.deepEqual(normalizeEstimate(null).items, []);
+});
+
+test('servings scale a food and meals follow the clock', () => {
+  const oats = scaleItem({ name: 'Oats', portion: '50 g', calories: 190, protein: 6.5, carbs: 33, fat: 3.5 }, 1.5);
+  assert.equal(oats.calories, 285);
+  assert.equal(oats.protein, 9.8);
+  assert.equal(mealForTime(new Date(2026, 9, 23, 8, 0)), 'breakfast');
+  assert.equal(mealForTime(new Date(2026, 9, 23, 13, 0)), 'lunch');
+  assert.equal(mealForTime(new Date(2026, 9, 23, 16, 0)), 'snack');
+  assert.equal(mealForTime(new Date(2026, 9, 23, 19, 30)), 'dinner');
+});
+
+test('a checked estimate passes through a second check unchanged', () => {
+  const once = normalizeEstimate({
+    items: [{ name: 'Rice', portion: '1 cup', calories: 205, protein_g: 4.3, carbs_g: 45, fat_g: 0.4 }],
+    confidence: 'high',
+    note: '',
+  });
+  assert.deepEqual(normalizeEstimate(once), once);
 });

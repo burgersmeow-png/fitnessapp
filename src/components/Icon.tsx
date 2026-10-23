@@ -30,6 +30,12 @@ const ICONS = {
   swim: { sf: 'figure.pool.swim', ion: 'water' },
   elliptical: { sf: 'figure.elliptical', ion: 'sync' },
   intervals: { sf: 'bolt.heart.fill', ion: 'flash' },
+  food: { sf: 'fork.knife', ion: 'restaurant' },
+  camera: { sf: 'camera.fill', ion: 'camera' },
+  photos: { sf: 'photo.on.rectangle', ion: 'images' },
+  search: { sf: 'magnifyingglass', ion: 'search' },
+  trash: { sf: 'trash', ion: 'trash-outline' },
+  sparkles: { sf: 'sparkles', ion: 'sparkles' },
 } as const satisfies Record<string, { sf: SFSymbol; ion: keyof typeof Ionicons.glyphMap }>;
 
 export type IconName = keyof typeof ICONS;

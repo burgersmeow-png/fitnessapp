@@ -9,8 +9,9 @@ import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { Icon, type IconName } from '../../components/Icon';
 import { SectionLabel, Loading } from '../../components/ui';
 import { CARDIO_BY_TYPE, cardioFatigue, type CardioSession } from '../../lib/cardio';
-import { activeWorkoutId, loadCardio, loadExercises, loadHistory, loadSettings, startWorkout } from '../../lib/db';
-import { MUSCLE_LABELS } from '../../lib/format';
+import { activeWorkoutId, loadCardio, loadExercises, loadFoodForDay, loadHistory, loadSettings, startWorkout } from '../../lib/db';
+import { dailyTargets, sumMacros, type Macros } from '../../lib/nutrition';
+import { formatNumber, MUSCLE_LABELS } from '../../lib/format';
 import { generateWorkout, type GeneratedWorkout } from '../../lib/generator';
 import { colors, radius, space, TAP, type } from '../../lib/theme';
 import { ALL_MUSCLES, type Exercise, type Settings } from '../../lib/types';
@@ -23,6 +24,8 @@ interface TodayData {
   activeId: number | null;
   weekSessions: number;
   lastCardio: CardioSession | null;
+  eaten: Macros;
+  targets: Macros;
 }
 
 const GOAL_LABEL = { strength: 'Strength', hypertrophy: 'Muscle', endurance: 'Endurance' };
@@ -33,12 +36,13 @@ export default function TodayScreen() {
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
   const [data] = useFocusData<TodayData>(async () => {
-    const [exercises, history, settings, activeId, cardio] = await Promise.all([
+    const [exercises, history, settings, activeId, cardio, food] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadSettings(db),
       activeWorkoutId(db),
       loadCardio(db, 7),
+      loadFoodForDay(db, new Date()),
     ]);
     const weekAgo = Date.now() - 7 * 864e5;
     const weekSessions = new Set([
@@ -54,6 +58,8 @@ export default function TodayScreen() {
       activeId,
       weekSessions,
       lastCardio: cardio[0] ?? null,
+      eaten: sumMacros(food),
+      targets: dailyTargets(settings.bodyWeightKg, settings.nutritionGoal, settings.goal),
     };
   }, [seed]);
 
@@ -136,6 +142,27 @@ export default function TodayScreen() {
           </Pressable>
         );
       })}
+
+      <Pressable
+        onPress={() => router.push('/food')}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.cardioCard, { marginBottom: space.sm }, pressed && { opacity: 0.8 }]}
+      >
+        <View style={styles.cardioIcon}>
+          <Icon name="food" size={22} color={colors.accent} />
+        </View>
+        <View style={{ flex: 1, marginLeft: space.md }}>
+          <Text style={styles.rowTitle}>
+            {formatNumber(data.eaten.calories)} / {formatNumber(data.targets.calories)} kcal
+          </Text>
+          <Text style={styles.rowMeta}>
+            {data.eaten.calories === 0
+              ? `Aim for ${data.targets.protein} g protein today. Snap your first meal.`
+              : `${Math.round(data.eaten.protein)} of ${data.targets.protein} g protein`}
+          </Text>
+        </View>
+        <Icon name="chevron" size={20} color={colors.textMuted} />
+      </Pressable>
 
       <Pressable onPress={() => router.push('/cardio')} accessibilityRole="button" style={({ pressed }) => [styles.cardioCard, pressed && { opacity: 0.8 }]}>
         <View style={styles.cardioIcon}>

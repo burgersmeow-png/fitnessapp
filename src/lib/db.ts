@@ -1,11 +1,12 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { CardioSession, CardioType } from './cardio';
 import { EXERCISES } from './exercises';
+import type { FoodEntry, FoodItem, Meal } from './nutrition';
 import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export const DATABASE_NAME = 'liftlab.db';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /*
  * Units: weights are stored in kilograms and distances in kilometres. They are
@@ -85,6 +86,23 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
       await db.runAsync('UPDATE sets SET weight = weight / ? WHERE weight IS NOT NULL', LB_PER_KG);
       await db.runAsync('UPDATE cardio SET distance = distance / ? WHERE distance IS NOT NULL', MI_PER_KM);
     }
+  }
+  if (version < 4) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS food (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        eaten_at TEXT NOT NULL,
+        meal TEXT NOT NULL,
+        name TEXT NOT NULL,
+        portion TEXT NOT NULL,
+        calories REAL NOT NULL,
+        protein REAL NOT NULL,
+        carbs REAL NOT NULL,
+        fat REAL NOT NULL,
+        source TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS food_eaten ON food(eaten_at);
+    `);
   }
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   await seedExercises(db);
@@ -311,5 +329,49 @@ export async function loadCardio(db: SQLiteDatabase, sinceDays?: number): Promis
     minutes: r.minutes,
     distance: fromKm(r.distance),
     rpe: r.rpe,
+  }));
+}
+
+export async function saveFood(
+  db: SQLiteDatabase,
+  items: FoodItem[],
+  meal: Meal,
+  source: FoodEntry['source'],
+  eatenAt = new Date(),
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (const i of items) {
+      await db.runAsync(
+        'INSERT INTO food (eaten_at, meal, name, portion, calories, protein, carbs, fat, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        eatenAt.toISOString(), meal, i.name, i.portion, i.calories, i.protein, i.carbs, i.fat, source,
+      );
+    }
+  });
+}
+
+export async function deleteFood(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM food WHERE id = ?', id);
+}
+
+/** Everything eaten on the given local calendar day, oldest first. */
+export async function loadFoodForDay(db: SQLiteDatabase, day: Date): Promise<FoodEntry[]> {
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+  const end = new Date(start.getTime());
+  end.setDate(end.getDate() + 1);
+  const rows = await db.getAllAsync<{
+    id: number; eaten_at: string; meal: string; name: string; portion: string;
+    calories: number; protein: number; carbs: number; fat: number; source: string;
+  }>('SELECT * FROM food WHERE eaten_at >= ? AND eaten_at < ? ORDER BY eaten_at', start.toISOString(), end.toISOString());
+  return rows.map((r) => ({
+    id: r.id,
+    eatenAt: r.eaten_at,
+    meal: r.meal as Meal,
+    name: r.name,
+    portion: r.portion,
+    calories: r.calories,
+    protein: r.protein,
+    carbs: r.carbs,
+    fat: r.fat,
+    source: r.source as FoodEntry['source'],
   }));
 }

@@ -21,6 +21,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Today', headerShown: false, tabBarIcon: icon('today') }} />
+      <Tabs.Screen name="food" options={{ title: 'Food', tabBarIcon: icon('food') }} />
       <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: icon('history') }} />
       <Tabs.Screen name="exercises" options={{ title: 'Exercises', tabBarIcon: icon('exercises') }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('settings') }} />

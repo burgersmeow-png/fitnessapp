@@ -7,6 +7,7 @@
     "expo": "~58.0.17",
     "expo-constants": "~58.0.13",
     "expo-haptics": "~58.0.7",
+    "expo-image-picker": "~58.0.10",
     "expo-linear-gradient": "~58.0.3",
     "expo-linking": "~58.0.14",
     "expo-notifications": "~58.1.6",
@@ -23,6 +24,7 @@
     "react-native-web": "~0.21.4"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
     "@types/react": "~19.3.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
@@ -33,7 +35,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "tsx --test src/lib/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "food-server": "tsx server/food-ai.ts"
   },
   "private": true
 }

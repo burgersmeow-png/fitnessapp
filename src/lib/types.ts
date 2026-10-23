@@ -44,6 +44,9 @@ export interface Settings {
   equipment: Equipment[];
   minutes: number;
   units: 'lb' | 'kg';
+  /** Stored in kg; null until the user enters it. */
+  bodyWeightKg: number | null;
+  nutritionGoal: 'lose' | 'maintain' | 'gain';
 }
 
 export interface PlannedExercise {
@@ -87,4 +90,6 @@ export const DEFAULT_SETTINGS: Settings = {
   equipment: [...ALL_EQUIPMENT],
   minutes: 45,
   units: 'lb',
+  bodyWeightKg: null,
+  nutritionGoal: 'maintain',
 };
