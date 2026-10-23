@@ -9,7 +9,8 @@ import { CARDIO_BY_TYPE, EFFORTS, type CardioSession } from '../../lib/cardio';
 import { loadCardio, loadExercises, loadHistory, loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
 import { BADGES, weekProgress } from '../../lib/habits';
-import { recapContent, recapMonth } from '../../lib/recap';
+import { recapContent, recapMonth, recapWeek, weekRecapContent } from '../../lib/recap';
+import { startOfWeek } from '../../lib/social';
 import { prHistory } from '../../lib/records';
 import type { CardContent } from '../../lib/shareCard';
 import { colors, radius, space, type } from '../../lib/theme';
@@ -20,7 +21,7 @@ type Entry = { kind: 'lift'; at: string; workout: WorkoutSummary } | { kind: 'ca
 
 export default function HistoryScreen() {
   const db = useSQLiteContext();
-  const [card, setCard] = useState<CardContent | null>(null);
+  const [card, setCard] = useState<{ content: CardContent; week: boolean } | null>(null);
   const [data] = useFocusData(async () => {
     const settings = await loadSettings(db);
     const [workouts, cardio, badges] = await Promise.all([loadWorkouts(db), loadCardio(db), checkBadges(db, settings.weeklyGoal)]);
@@ -37,11 +38,18 @@ export default function HistoryScreen() {
   const monthName = month.toLocaleDateString(undefined, { month: 'long' });
   const trainedThisMonth = entries.some((e) => new Date(e.at).getMonth() === month.getMonth() && new Date(e.at).getFullYear() === month.getFullYear());
 
+  const week = recapWeek(new Date(), entries.map((e) => e.at));
+  const weekEnd = week.getTime() + 7 * 864e5;
+  const trainedThisWeek = entries.some((e) => Date.parse(e.at) >= week.getTime() && Date.parse(e.at) < weekEnd);
+  const weekName = week.getTime() === startOfWeek(new Date()).getTime() ? 'week' : 'last week';
+
   // Sets and exercises are only needed for the card, so they load on tap.
-  const shareMonth = async () => {
+  const share = async (which: 'week' | 'month') => {
     const [history, exercises] = await Promise.all([loadHistory(db), loadExercises(db)]);
     const names = new Map(exercises.map((e) => [e.id, e.name]));
-    setCard(recapContent({ month, workouts, cardio, history, prs: prHistory(history, 1000), name: (id) => names.get(id) ?? id, units: settings.units }));
+    const r = { workouts, cardio, history, prs: prHistory(history, 1000), name: (id: string) => names.get(id) ?? id, units: settings.units };
+    const content = which === 'week' ? weekRecapContent({ ...r, week }) : recapContent({ ...r, month });
+    if (content) setCard({ content, week: which === 'week' });
   };
 
   return (
@@ -98,8 +106,16 @@ export default function HistoryScreen() {
           <Text style={styles.meta}>Best sets, recent PRs</Text>
           <Icon name="chevron" size={14} color={colors.textMuted} />
         </Pressable>
+        {trainedThisWeek && (
+          <Pressable onPress={() => share('week')} accessibilityRole="button" style={({ pressed }) => [styles.progressRow, pressed && { opacity: 0.8 }]}>
+            <Icon name="share" size={20} color={colors.accent} />
+            <Text style={[type.body, { flex: 1, fontWeight: '700' }]}>Share your {weekName}</Text>
+            <Text style={styles.meta}>Story-sized recap</Text>
+            <Icon name="chevron" size={14} color={colors.textMuted} />
+          </Pressable>
+        )}
         {trainedThisMonth && (
-          <Pressable onPress={shareMonth} accessibilityRole="button" style={({ pressed }) => [styles.progressRow, pressed && { opacity: 0.8 }]}>
+          <Pressable onPress={() => share('month')} accessibilityRole="button" style={({ pressed }) => [styles.progressRow, pressed && { opacity: 0.8 }]}>
             <Icon name="share" size={20} color={colors.accent} />
             <Text style={[type.body, { flex: 1, fontWeight: '700' }]}>Share your {monthName}</Text>
             <Text style={styles.meta}>Story-sized recap</Text>
@@ -169,7 +185,12 @@ export default function HistoryScreen() {
         );
       }}
     />
-    <ShareCardSheet content={card} onClose={() => setCard(null)} title={`Share your ${monthName}`} fileName="liftlab-month.png" />
+    <ShareCardSheet
+      content={card?.content ?? null}
+      onClose={() => setCard(null)}
+      title={card?.week ? `Share your ${weekName}` : `Share your ${monthName}`}
+      fileName={card?.week ? 'liftlab-week.png' : 'liftlab-month.png'}
+    />
     </>
   );
 }
