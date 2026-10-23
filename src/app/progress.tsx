@@ -12,33 +12,40 @@ import { liftTrends, setsPerMuscle, trainingDaysPerWeek, trend, trendChange, WEE
 import { colors, radius, space, type } from '../lib/theme';
 import { useFocusData } from '../lib/useData';
 import { loadSessionDates } from '../services/habits';
+import { ShareCardSheet } from '../components/ShareCardSheet';
+import { progressCardContent, progressSummary } from '../lib/progressCard';
+import type { CardContent } from '../lib/shareCard';
 
 export default function ProgressScreen() {
   const db = useSQLiteContext();
   const [entry, setEntry] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [pickedWeek, setPickedWeek] = useState<number | null>(null);
+  const [card, setCard] = useState<CardContent | null>(null);
   const [data, reload] = useFocusData(async () => {
-    const [weights, history, exercises, settings, dates, measurements] = await Promise.all([
+    const [weights, history, exercises, settings, dates, measurements, allTime] = await Promise.all([
       loadBodyWeights(db, 120),
       loadHistory(db, 84),
       loadExercises(db),
       loadSettings(db),
       loadSessionDates(db),
       loadMeasurements(db),
+      loadHistory(db),
     ]);
+    const liftDays = [...new Set(allTime.map((s) => s.completedAt.slice(0, 10)))];
     return {
       weights,
       measurements,
       settings,
       names: new Map(exercises.map((e) => [e.id, e.name])),
       lifts: liftTrends(history),
+      summary: progressSummary(allTime, liftDays, new Date()),
       weeks: trainingDaysPerWeek(dates),
       muscles: setsPerMuscle(history, new Map(exercises.map((e) => [e.id, e]))),
     };
   });
   if (!data) return <Loading />;
-  const { weights, settings, lifts, weeks, names, muscles, measurements } = data;
+  const { weights, settings, lifts, weeks, names, muscles, measurements, summary } = data;
   // Scale so the top of the target band and the busiest muscle both fit.
   const muscleMax = Math.max(WEEKLY_SETS.high + 4, ...muscles.map((m) => m.sets));
   const unit = settings.units;
@@ -62,6 +69,28 @@ export default function ProgressScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
+      {summary && (
+        <Pressable
+          onPress={() => setCard(progressCardContent(summary, (id) => names.get(id) ?? id, settings.units))}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.shareRow, pressed && { opacity: 0.8 }]}
+        >
+          <View style={styles.shareIcon}>
+            <Icon name="share" size={20} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1, marginLeft: space.md }}>
+            <Text style={styles.value}>Share how far you’ve come</Text>
+            <Text style={styles.muted}>
+              {summary.gains.length
+                ? `${summary.gains.length} ${summary.gains.length === 1 ? 'lift' : 'lifts'} up in ${summary.weeks} ${summary.weeks === 1 ? 'week' : 'weeks'}`
+                : `${summary.workouts} workouts in ${summary.weeks} ${summary.weeks === 1 ? 'week' : 'weeks'}`}
+            </Text>
+          </View>
+          <Icon name="chevron" size={20} color={colors.textMuted} />
+        </Pressable>
+      )}
+      <ShareCardSheet content={card} onClose={() => setCard(null)} title="Share your progress" fileName="liftlab-progress.png" />
+
       <SectionLabel>Body weight</SectionLabel>
       <Card>
         {smooth.length > 0 && (
@@ -219,6 +248,8 @@ export default function ProgressScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  shareRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.md, marginBottom: space.sm },
+  shareIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   headline: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: space.md },
   muted: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
   small: { color: colors.textMuted, fontSize: 12 },
