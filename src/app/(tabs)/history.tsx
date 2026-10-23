@@ -71,6 +71,16 @@ export default function HistoryScreen() {
           <Text style={styles.meta}>Weight, strength, consistency</Text>
           <Icon name="chevron" size={14} color={colors.textMuted} />
         </Pressable>
+        <Pressable
+          onPress={() => router.push('/records')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.progressRow, pressed && { opacity: 0.8 }]}
+        >
+          <Icon name="trophy" size={20} color={colors.warning} />
+          <Text style={[type.body, { flex: 1, fontWeight: '700' }]}>Personal records</Text>
+          <Text style={styles.meta}>Best sets, recent PRs</Text>
+          <Icon name="chevron" size={14} color={colors.textMuted} />
+        </Pressable>
         </View>
       }
       ListEmptyComponent={
