@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BodyMap, recoveryColor, recoveryFills } from '../../components/BodyMap';
 import { CoachPlanCard } from '../../components/CoachPlanCard';
+import { CreatorFeedCard } from '../../components/CreatorFeedCard';
 import { ExerciseThumb } from '../../components/ExerciseThumb';
 import { GoalCard } from '../../components/GoalCard';
 import { ProgressRing } from '../../components/ProgressRing';
@@ -163,6 +164,7 @@ export default function TodayScreen() {
       )}
 
       <CoachPlanCard activeId={activeId} />
+      <CreatorFeedCard />
 
       <LinearGradient colors={['#FF6A2B', '#E5341B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={{ flexDirection: 'row' }}>
