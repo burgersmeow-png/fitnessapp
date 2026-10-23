@@ -7,7 +7,7 @@ import { CARDIO_BY_TYPE, EFFORTS, type CardioSession } from '../../lib/cardio';
 import { loadCardio, loadSettings, loadWorkouts, type WorkoutSummary } from '../../lib/db';
 import { formatDate, formatDuration, formatNumber } from '../../lib/format';
 import { BADGES, weekProgress } from '../../lib/habits';
-import { colors, space, type } from '../../lib/theme';
+import { colors, radius, space, type } from '../../lib/theme';
 import { useFocusData } from '../../lib/useData';
 import { checkBadges } from '../../services/habits';
 
@@ -35,6 +35,7 @@ export default function HistoryScreen() {
       data={entries}
       keyExtractor={(e) => (e.kind === 'lift' ? `w${e.workout.id}` : `c${e.cardio.id}`)}
       ListHeaderComponent={
+        <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <Card style={{ flex: 1, flexBasis: 0 }}>
             <Icon name="flame" size={20} color={colors.accent} />
@@ -59,6 +60,17 @@ export default function HistoryScreen() {
               <Text style={type.label}>BADGES</Text>
             </Card>
           </Pressable>
+        </View>
+        <Pressable
+          onPress={() => router.push('/progress')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.progressRow, pressed && { opacity: 0.8 }]}
+        >
+          <Icon name="pulse" size={20} color={colors.accent} />
+          <Text style={[type.body, { flex: 1, fontWeight: '700' }]}>Progress charts</Text>
+          <Text style={styles.meta}>Weight, strength, consistency</Text>
+          <Icon name="chevron" size={14} color={colors.textMuted} />
+        </Pressable>
         </View>
       }
       ListEmptyComponent={
@@ -121,6 +133,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   meta: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
   of: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: colors.surface },
   icon: {
     width: 44,
     height: 44,

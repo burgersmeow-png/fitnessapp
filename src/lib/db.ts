@@ -6,7 +6,7 @@ import type { Exercise, LoggedSet, PlannedExercise, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export const DATABASE_NAME = 'liftlab.db';
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 /*
  * Units: weights are stored in kilograms and distances in kilometres. They are
@@ -113,6 +113,17 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
     await db.execAsync(`
       ALTER TABLE cardio ADD COLUMN source_id TEXT;
       CREATE UNIQUE INDEX IF NOT EXISTS cardio_source ON cardio(source_id);
+    `);
+  }
+  if (version < 6) {
+    // Body weight over time, in kg. The latest reading also lives in settings for nutrition targets.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS body_weights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        measured_at TEXT NOT NULL,
+        kg REAL NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS body_weights_at ON body_weights(measured_at);
     `);
   }
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -418,4 +429,33 @@ export async function loadFoodForDay(db: SQLiteDatabase, day: Date): Promise<Foo
     fat: r.fat,
     source: r.source as FoodEntry['source'],
   }));
+}
+
+export interface BodyWeight {
+  id: number;
+  measuredAt: string;
+  /** In the display unit. */
+  weight: number;
+}
+
+/** Logs a weigh-in (display units) and makes it the body weight used for nutrition targets. */
+export async function logBodyWeight(db: SQLiteDatabase, weight: number, at = new Date()): Promise<void> {
+  const kg = Math.round(toKg(weight) * 100) / 100;
+  await db.runAsync('INSERT INTO body_weights (measured_at, kg) VALUES (?, ?)', at.toISOString(), kg);
+  const settings = await loadSettings(db);
+  await saveSettings(db, { ...settings, bodyWeightKg: Math.round(kg * 10) / 10 });
+}
+
+export async function deleteBodyWeight(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM body_weights WHERE id = ?', id);
+}
+
+/** Weigh-ins, oldest first. `sinceDays` limits how far back to look. */
+export async function loadBodyWeights(db: SQLiteDatabase, sinceDays?: number): Promise<BodyWeight[]> {
+  const since = sinceDays ? new Date(Date.now() - sinceDays * 864e5).toISOString() : '';
+  const rows = await db.getAllAsync<{ id: number; measured_at: string; kg: number }>(
+    'SELECT * FROM body_weights WHERE measured_at >= ? ORDER BY measured_at',
+    since,
+  );
+  return rows.map((r) => ({ id: r.id, measuredAt: r.measured_at, weight: fromKg(r.kg) }));
 }
