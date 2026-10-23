@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import Svg, { Circle, Defs, G, LinearGradient, RadialGradient, Rect, Stop, Text } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Image, LinearGradient, RadialGradient, Rect, Stop, Text } from 'react-native-svg';
 import type { CardContent } from '../lib/shareCard';
 import { colors } from '../lib/theme';
 
@@ -20,6 +20,11 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trim
 export const ShareCard = forwardRef<Svg, { content: CardContent; width: number }>(function ShareCard({ content, width }, ref) {
   const statW = (CARD_W - 2 * X - 2 * 30) / 3;
   const listTop = 960;
+  // A before-and-after card puts the photos where the stats go, and the stats below them.
+  const photos = content.photos;
+  const photoW = (CARD_W - 2 * X - 30) / 2;
+  const photoH = 800;
+  const statsY = photos ? 1470 : 620;
   return (
     <Svg ref={ref} width={width} height={(width * CARD_H) / CARD_W} viewBox={`0 0 ${CARD_W} ${CARD_H}`}>
       <Defs>
@@ -31,6 +36,16 @@ export const ShareCard = forwardRef<Svg, { content: CardContent; width: number }
           <Stop offset="0" stopColor={colors.accent} stopOpacity="0.55" />
           <Stop offset="1" stopColor={colors.accent} stopOpacity="0" />
         </RadialGradient>
+        {photos && (
+          <>
+            <ClipPath id="photoBefore">
+              <Rect x={X} y={600} width={photoW} height={photoH} rx={36} />
+            </ClipPath>
+            <ClipPath id="photoAfter">
+              <Rect x={X + photoW + 30} y={600} width={photoW} height={photoH} rx={36} />
+            </ClipPath>
+          </>
+        )}
       </Defs>
       <Rect width={CARD_W} height={CARD_H} fill="url(#bg)" />
       <Circle cx={CARD_W - 80} cy={160} r={520} fill="url(#glow)" />
@@ -43,13 +58,28 @@ export const ShareCard = forwardRef<Svg, { content: CardContent; width: number }
       <Text x={X} y={480} fontSize={headlineSize(content.headline)} fontWeight="900" fill={colors.text} fontFamily={FONT}>{content.headline}</Text>
       <Rect x={X} y={530} width={140} height={14} rx={7} fill={colors.accent} />
 
+      {photos &&
+        [photos.before, photos.after].map((p, i) => {
+          const x = X + i * (photoW + 30);
+          return (
+            <G key={i}>
+              <Rect x={x} y={600} width={photoW} height={photoH} rx={36} fill={colors.surfaceRaised} />
+              <Image x={x} y={600} width={photoW} height={photoH} href={p.uri} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${i ? 'photoAfter' : 'photoBefore'})`} />
+              <Rect x={x + 24} y={624} width={i ? 150 : 180} height={56} rx={28} fill={i ? colors.accent : colors.background} opacity={0.9} />
+              <Text x={x + 24 + (i ? 75 : 90)} y={662} fontSize={28} fontWeight="900" fill={i ? colors.accentText : colors.text} letterSpacing={2} textAnchor="middle" fontFamily={FONT}>{i ? 'AFTER' : 'BEFORE'}</Text>
+              <Text x={x} y={1450} fontSize={30} fontWeight="700" fill={colors.textMuted} letterSpacing={2} fontFamily={FONT}>{p.label}</Text>
+            </G>
+          );
+        })}
+
       {content.stats.map((s, i) => {
         const x = X + i * (statW + 30);
+        const h = photos ? 230 : 250;
         return (
           <G key={s.label}>
-            <Rect x={x} y={620} width={statW} height={250} rx={36} fill={colors.surfaceRaised} />
-            <Text x={x + 40} y={770} fontSize={s.value.length > 4 ? 70 : s.value.length > 3 ? 80 : 92} fontWeight="800" fill={colors.text} fontFamily={FONT}>{s.value}</Text>
-            <Text x={x + 40} y={830} fontSize={28} fontWeight="700" fill={colors.textMuted} letterSpacing={2} fontFamily={FONT}>{s.label}</Text>
+            <Rect x={x} y={statsY + (photos ? 20 : 0)} width={statW} height={h} rx={36} fill={colors.surfaceRaised} />
+            <Text x={x + 40} y={statsY + (photos ? 155 : 150)} fontSize={s.value.length > 4 ? 70 : s.value.length > 3 ? 80 : 92} fontWeight="800" fill={colors.text} fontFamily={FONT}>{s.value}</Text>
+            <Text x={x + 40} y={statsY + (photos ? 215 : 210)} fontSize={28} fontWeight="700" fill={colors.textMuted} letterSpacing={2} fontFamily={FONT}>{s.label}</Text>
           </G>
         );
       })}

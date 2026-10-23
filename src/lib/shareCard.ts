@@ -25,6 +25,13 @@ export interface CardContent {
   footer: string;
   /** A creator's own code, shown in place of the footer so every post can bring sign-ups. */
   code?: string;
+  /** Before-and-after photos (data URIs), drawn side by side in place of the lines. */
+  photos?: { before: CardPhoto; after: CardPhoto };
+}
+
+export interface CardPhoto {
+  uri: string;
+  label: string;
 }
 
 /** The card as a creator posts it: their code where the footer was. */
