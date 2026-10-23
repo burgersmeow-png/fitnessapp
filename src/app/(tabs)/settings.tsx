@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StravaCard } from '../../components/StravaCard';
 import { stravaEnabled } from '../../services/strava';
+import { socialConfigured } from '../../services/supabase';
 import { Chip, SectionLabel, Loading } from '../../components/ui';
 import { fromKg, loadSettings, saveSettings, toKg } from '../../lib/db';
 import { dailyTargets } from '../../lib/nutrition';
@@ -96,6 +97,16 @@ export default function SettingsScreen() {
         <Chip label="Pounds (lb, mi)" selected={settings.units === 'lb'} onPress={() => update({ units: 'lb' })} />
       </View>
       <Text style={styles.note}>Switching converts all your past weights and distances too.</Text>
+      {socialConfigured && (
+        <>
+          <SectionLabel>Friends</SectionLabel>
+          <View style={styles.wrap}>
+            <Chip label="Share my sessions" selected={settings.shareWithFriends} onPress={() => update({ shareWithFriends: true })} />
+            <Chip label="Keep private" selected={!settings.shareWithFriends} onPress={() => update({ shareWithFriends: false })} />
+          </View>
+          <Text style={styles.note}>When you’re signed in, a summary of each finished workout or cardio session goes to friends you’ve accepted.</Text>
+        </>
+      )}
       {stravaEnabled && (
         <>
           <SectionLabel>Strava</SectionLabel>

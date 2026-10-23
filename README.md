@@ -20,8 +20,11 @@ Working name; rename any time in `app.json`.
   "add 30 seconds" or "what's next". The coach answers out loud and tells you when rest is over.
   Speech comes from the iPhone keyboard's dictation mic, and everything is understood on the phone
 - **Cardio**: log runs, rides, rowing, swims and intervals; they count toward muscle recovery
+- **Friends**: add friends by username, see their workouts and runs in a feed, give high-fives and
+  comment, and compare the week on a leaderboard ranked by sessions, so consistency wins. Finished
+  sessions are shared automatically (switch it off in Settings), and only accepted friends see them
 - **History**: workouts and cardio, weekly streak, volume
-- **Exercises**: 66 exercises with body-map thumbnails, searchable and filtered by muscle, with a strength trend
+- **Exercises** (from History): 66 exercises with body-map thumbnails, searchable and filtered by muscle, with a strength trend
 - **Exercises** also have an animated, drawn demo and step-by-step cues
 - **Settings**: goal (strength, muscle, endurance), workout length, your equipment, lb or kg, body weight
   and nutrition goal
@@ -75,6 +78,34 @@ To try it on your own phone:
 Searching foods and adding them by hand work without any of this. For the App Store, the same server runs
 on a host (for example Cloudflare, Render or Fly.io) and the URL points there.
 
+## Friends and feed
+
+The Friends tab uses a free [Supabase](https://supabase.com) project as its online database. Workouts stay
+on the phone; only a summary of each finished session is shared. To set it up (about 10 minutes, free):
+
+1. Sign up at [supabase.com](https://supabase.com) and create a **New project** on the free plan. Pick
+   the region closest to you and save the database password somewhere safe.
+2. Open **SQL Editor**, start a new query, paste everything from
+   `supabase/migrations/20261023000000_social.sql`, and press **Run**.
+3. Under **Authentication → Sign In / Providers → Email**, turn off **Confirm email** while you test. The
+   free plan only sends a few emails an hour.
+4. Open **Connect** (or **Project Settings → API**) and copy the **Project URL** and the **anon** (or
+   **publishable**) key into `.env.local`:
+
+   ```
+   EXPO_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+   ```
+
+5. Restart `npx expo start`. The Friends tab now offers sign up.
+
+The anon key is safe to ship in the app: the database's row level security decides what each person can
+see. Never put the **service_role** (secret) key in the app. Free projects pause after a week with no use;
+press **Restore** in the Supabase dashboard to wake one up.
+
+To check the privacy rules against a test project:
+`SUPABASE_URL=... SUPABASE_ANON_KEY=... npm run test:social` (it creates and deletes throwaway accounts).
+
 ## Strava (switched off for now)
 
 The code to import runs, rides and swims from Strava and to post lifting sessions to Strava is in the
@@ -111,6 +142,8 @@ Code layout:
 - `src/lib/voice.ts` understands spoken coach commands (offline)
 - `src/lib/nutrition.ts` calorie and macro targets, totals, photo-estimate checks, common foods
 - `server/` the helper server: meal photo estimates (Claude, prompt in `src/lib/foodPrompt.ts`) and Strava sign-in
+- `src/lib/social.ts` feed shapes, leaderboard and titles; `src/services/social.ts` accounts, friends, feed
+- `supabase/migrations/` the online database and its privacy rules; `supabase/tests/` checks for those rules
 - `src/lib/strava.ts` Strava activity mapping; `src/services/strava.ts` sign-in, sync and posting
 - `src/components/BodyMap.tsx` the front and back body illustration
 - `src/lib/db.ts` SQLite schema and queries
@@ -120,5 +153,5 @@ Code layout:
 ## Next
 
 See the plan doc for the full roadmap: Apple Health and Watch, programs, barcode scanning,
-Garmin, always-on voice listening, social features and trainer mode. HealthKit and the Watch
+Garmin, always-on voice listening and trainer mode. HealthKit and the Watch
 app need a development build through EAS and a paid Apple Developer account.

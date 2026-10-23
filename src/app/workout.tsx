@@ -11,6 +11,7 @@ import {
   activeWorkoutId,
   addSet,
   finishWorkout,
+  toKg,
   loadExercises,
   loadHistory,
   loadSettings,
@@ -29,6 +30,8 @@ import { EXAMPLES, parseCommand } from '../lib/voice';
 import { CoachBar } from '../components/CoachBar';
 import { StravaShare } from '../components/StravaShare';
 import type { WorkoutForStrava } from '../lib/strava';
+import { workoutTitle } from '../lib/social';
+import { sharePost } from '../services/social';
 import { Icon } from '../components/Icon';
 
 function close() {
@@ -309,6 +312,34 @@ export default function WorkoutScreen() {
           }),
         },
       });
+      if (settings?.shareWithFriends) {
+        const started = new Date(startedAt.current).toISOString();
+        // Ordered by sets, so the title names what was trained most.
+        const muscles = [...byExercise]
+          .sort((a, b) => b[1].length - a[1].length)
+          .flatMap(([id]) => (exercises.get(id)?.primary ?? []).map((m) => MUSCLE_LABELS[m]));
+        sharePost(db, {
+          clientId: `workout:${workoutId}`,
+          kind: 'workout',
+          title: workoutTitle(started, muscles),
+          happenedAt: started,
+          body: {
+            minutes,
+            sets: finished.length,
+            volumeKg: Math.round(finished.reduce((sum, s) => sum + toKg(s.weight ?? 0) * (s.reps ?? 0), 0)),
+            prs: prNames,
+            exercises: [...byExercise].map(([id, list]) => {
+              const best = list.reduce((a, b) => (strength(b) > strength(a) ? b : a));
+              return {
+                name: exercises.get(id)?.name ?? id,
+                sets: list.length,
+                bestKg: best.weight != null ? Math.round(toKg(best.weight) * 10) / 10 : null,
+                bestReps: best.reps,
+              };
+            }),
+          },
+        }).catch(() => {});
+      }
     };
     const remaining = sets.length - done;
     if (remaining > 0 && Platform.OS === 'web') {

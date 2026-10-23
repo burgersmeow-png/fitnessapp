@@ -47,6 +47,8 @@ export interface Settings {
   /** Stored in kg; null until the user enters it. */
   bodyWeightKg: number | null;
   nutritionGoal: 'lose' | 'maintain' | 'gain';
+  /** Post finished workouts and cardio to friends' feeds, when signed in. */
+  shareWithFriends: boolean;
 }
 
 export interface PlannedExercise {
@@ -92,4 +94,5 @@ export const DEFAULT_SETTINGS: Settings = {
   units: 'lb',
   bodyWeightKg: null,
   nutritionGoal: 'maintain',
+  shareWithFriends: true,
 };

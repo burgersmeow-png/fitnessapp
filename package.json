@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@supabase/supabase-js": "^2.118.0",
     "expo": "~58.0.17",
     "expo-constants": "~58.0.13",
     "expo-haptics": "~58.0.7",
@@ -38,7 +39,8 @@
     "web": "expo start --web",
     "test": "tsx --test src/lib/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "server": "tsx server/index.ts"
+    "server": "tsx server/index.ts",
+    "test:social": "node --test supabase/tests/rls.test.mjs"
   },
   "private": true
 }

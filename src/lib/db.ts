@@ -20,12 +20,16 @@ let units: Settings['units'] = DEFAULT_SETTINGS.units;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 /** Stored kg to display units. */
 export const fromKg = (kg: number) => round1(units === 'lb' ? kg * LB_PER_KG : kg);
+/** The units picked in Settings, for labels next to converted numbers. */
+export const displayUnits = () => ({ weight: units, distance: units === 'kg' ? 'km' : 'mi' }) as const;
 /** Display units to stored kg. */
 export const toKg = (w: number) => (units === 'lb' ? w / LB_PER_KG : w);
 const fromKgOrNull = (kg: number | null) => (kg == null ? null : fromKg(kg));
 const toKgOrNull = (w: number | null | undefined) => (w == null ? null : toKg(w));
-const fromKm = (km: number | null) => (km == null ? null : round1(units === 'lb' ? km * MI_PER_KM : km));
-const toKm = (d: number | null) => (d == null ? null : units === 'lb' ? d / MI_PER_KM : d);
+/** Stored km to display units (km or mi). */
+export const fromKm = (km: number | null) => (km == null ? null : round1(units === 'lb' ? km * MI_PER_KM : km));
+/** Display units to stored km. */
+export const toKm = (d: number | null) => (d == null ? null : units === 'lb' ? d / MI_PER_KM : d);
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');

@@ -38,6 +38,12 @@ const ICONS = {
   trash: { sf: 'trash', ion: 'trash-outline' },
   sparkles: { sf: 'sparkles', ion: 'sparkles' },
   close: { sf: 'xmark', ion: 'close' },
+  friends: { sf: 'person.2.fill', ion: 'people' },
+  addFriend: { sf: 'person.badge.plus', ion: 'person-add' },
+  highFive: { sf: 'hand.raised.fill', ion: 'hand-left' },
+  highFiveOff: { sf: 'hand.raised', ion: 'hand-left-outline' },
+  comment: { sf: 'bubble.left', ion: 'chatbubble-outline' },
+  send: { sf: 'arrow.up.circle.fill', ion: 'arrow-up-circle' },
 } as const satisfies Record<string, { sf: SFSymbol; ion: keyof typeof Ionicons.glyphMap }>;
 
 export type IconName = keyof typeof ICONS;

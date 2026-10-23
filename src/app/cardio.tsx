@@ -9,7 +9,9 @@ import { Icon } from '../components/Icon';
 import { Button, SectionLabel } from '../components/ui';
 import { MUSCLE_LABELS } from '../lib/format';
 import { CARDIO_BY_TYPE, CARDIO_KINDS, EFFORTS, type CardioType } from '../lib/cardio';
-import { loadSettings, saveCardio } from '../lib/db';
+import { loadSettings, saveCardio, toKm } from '../lib/db';
+import { cardioTitle } from '../lib/social';
+import { sharePost } from '../services/social';
 import { useFocusData } from '../lib/useData';
 import { colors, radius, space, type } from '../lib/theme';
 import type { Muscle } from '../lib/types';
@@ -33,13 +35,19 @@ export default function CardioScreen() {
   }
 
   const save = async () => {
-    await saveCardio(db, {
-      type: kind,
-      startedAt: new Date(Date.now() - minutes * 6e4).toISOString(),
-      minutes,
-      distance: selected.hasDistance && distance.trim() !== '' && !Number.isNaN(Number(distance)) ? Number(distance) : null,
-      rpe,
-    });
+    const startedAt = new Date(Date.now() - minutes * 6e4).toISOString();
+    const dist = selected.hasDistance && distance.trim() !== '' && !Number.isNaN(Number(distance)) ? Number(distance) : null;
+    await saveCardio(db, { type: kind, startedAt, minutes, distance: dist, rpe });
+    if (settings?.shareWithFriends) {
+      const km = toKm(dist);
+      sharePost(db, {
+        clientId: `cardio:${startedAt}`,
+        kind: 'cardio',
+        title: cardioTitle(startedAt, selected.label),
+        happenedAt: startedAt,
+        body: { cardioType: kind, minutes, distanceKm: km == null ? null : Math.round(km * 100) / 100 },
+      }).catch(() => {});
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
   };

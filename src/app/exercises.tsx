@@ -2,13 +2,13 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ExerciseThumb } from '../../components/ExerciseThumb';
-import { Chip } from '../../components/ui';
-import { loadExercises } from '../../lib/db';
-import { MUSCLE_LABELS } from '../../lib/format';
-import { colors, radius, space } from '../../lib/theme';
-import { ALL_MUSCLES, type Muscle } from '../../lib/types';
-import { useFocusData } from '../../lib/useData';
+import { ExerciseThumb } from '../components/ExerciseThumb';
+import { Chip } from '../components/ui';
+import { loadExercises } from '../lib/db';
+import { MUSCLE_LABELS } from '../lib/format';
+import { colors, radius, space } from '../lib/theme';
+import { ALL_MUSCLES, type Muscle } from '../lib/types';
+import { useFocusData } from '../lib/useData';
 
 export default function ExercisesScreen() {
   const db = useSQLiteContext();

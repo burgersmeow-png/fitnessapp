@@ -21,6 +21,9 @@ Read `AGENTS.md` too (Expo-specific rules: versioned docs, `npx expo install`, E
 - Voice: `src/lib/voice.ts` parses dictated text offline (no AI call); `src/services/speech.ts` speaks
   replies. Speech-to-text is the iPhone keyboard's dictation mic for now; always-on listening needs a
   native speech module and a development build.
+- Social: Supabase (Postgres + Auth) through `@supabase/supabase-js`. Schema changes go in a new file in
+  `supabase/migrations/`; every table has row level security, and `supabase/tests/rls.test.mjs` must
+  pass against a test project. Never ship the service_role key. The app works fully offline without it.
 - One feature per screen file; extract a component when a screen passes ~300 lines.
 - No new dependencies unless the owner approves. Prefer Expo modules that run in Expo Go.
 
