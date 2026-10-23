@@ -46,6 +46,7 @@ export default function RootLayout() {
           <Stack.Screen name="post/[id]" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="exercises" options={{ title: 'Exercises', headerBackTitle: 'Back' }} />
           <Stack.Screen name="badges" options={{ title: 'Badges', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="programs" options={{ title: 'Programs', headerBackTitle: 'Back' }} />
           <Stack.Screen name="coaching/index" options={{ title: 'Coaching', headerBackTitle: 'Back' }} />
           <Stack.Screen name="coaching/client/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
           <Stack.Screen name="coaching/assign" options={{ title: 'Assign workout', presentation: 'modal' }} />

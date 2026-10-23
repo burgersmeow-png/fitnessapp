@@ -32,6 +32,7 @@ import { StravaShare } from '../components/StravaShare';
 import type { WorkoutForStrava } from '../lib/strava';
 import { workoutTitle } from '../lib/social';
 import { finishAssignedWorkout } from '../services/coaching';
+import { finishProgramWorkout } from '../services/programs';
 import { checkBadges, loadSessionDates, markBadgesSeen } from '../services/habits';
 import { goalLine, weekProgress, type Badge, type WeekProgress } from '../lib/habits';
 import { sharePost } from '../services/social';
@@ -291,6 +292,7 @@ export default function WorkoutScreen() {
       const prNames = [...new Set(finished.filter((s) => prSets.has(s.id)).map((s) => exercises.get(s.exerciseId)?.name ?? ''))];
       await finishWorkout(db, workoutId!);
       if (finished.length > 0) finishAssignedWorkout(db, workoutId!).catch(() => {});
+      if (finished.length > 0) await finishProgramWorkout(db, workoutId!);
       skipRest();
       if (finished.length === 0) {
         close();

@@ -15,11 +15,13 @@ import { activeWorkoutId, loadCardio, loadExercises, loadFoodForDay, loadHistory
 import { dailyTargets, sumMacros, type Macros } from '../../lib/nutrition';
 import { formatNumber, MUSCLE_LABELS } from '../../lib/format';
 import { generateWorkout, type GeneratedWorkout } from '../../lib/generator';
+import { deloadWorkout, programStep, type ProgramStep } from '../../lib/programs';
 import { weekProgress, type Badge, type WeekProgress } from '../../lib/habits';
 import { colors, radius, space, TAP, type } from '../../lib/theme';
 import { ALL_MUSCLES, type Exercise, type Settings } from '../../lib/types';
 import { useFocusData } from '../../lib/useData';
 import { checkBadges, loadSessionDates } from '../../services/habits';
+import { loadProgram, rememberProgramWorkout } from '../../services/programs';
 import { syncReminders } from '../../services/reminders';
 import { syncStravaIfDue } from '../../services/strava';
 
@@ -30,6 +32,7 @@ interface TodayData {
   activeId: number | null;
   week: WeekProgress;
   freshBadges: Badge[];
+  step: ProgramStep | null;
   lastCardio: CardioSession | null;
   eaten: Macros;
   targets: Macros;
@@ -43,7 +46,7 @@ export default function TodayScreen() {
   // Bumping the seed regenerates the plan with fresh history.
   const [seed, setSeed] = useState(0);
   const [data, reload] = useFocusData<TodayData>(async () => {
-    const [exercises, history, settings, activeId, cardio, food, sessionDates] = await Promise.all([
+    const [exercises, history, settings, activeId, cardio, food, sessionDates, program] = await Promise.all([
       loadExercises(db),
       loadHistory(db, 30),
       loadSettings(db),
@@ -51,14 +54,20 @@ export default function TodayScreen() {
       loadCardio(db, 7),
       loadFoodForDay(db, new Date()),
       loadSessionDates(db),
+      loadProgram(db),
     ]);
     const badges = await checkBadges(db, settings.weeklyGoal);
     // Re-plan reminders whenever Today opens, so they reflect what's been done.
     syncReminders(db, settings);
     // Leave out a different slice of the library each time the user asks for another plan.
     const rotated = seed === 0 ? exercises : exercises.filter((_, i) => (i + seed) % 4 !== 0);
+    // A program decides what to train today; recovery and progression still pick the lifts.
+    const step = program ? programStep(program) : null;
+    const following = step && !step.finished ? step : null;
+    const planned = generateWorkout(rotated, history, settings, new Date(), cardioFatigue(cardio), following?.day.focus);
     return {
-      workout: generateWorkout(rotated, history, settings, new Date(), cardioFatigue(cardio)),
+      workout: following?.deload ? deloadWorkout(planned, settings.units === 'kg' ? 2.5 : 5) : planned,
+      step,
       exercises: new Map(exercises.map((e) => [e.id, e])),
       settings,
       activeId,
@@ -78,10 +87,14 @@ export default function TodayScreen() {
   if (!data) return <Loading />;
   const { workout, exercises, settings, activeId, lastCardio } = data;
   const totalSets = workout.exercises.reduce((n, p) => n + p.sets, 0);
+  const following = data.step && !data.step.finished ? data.step : null;
   const fresh = [...ALL_MUSCLES].sort((a, b) => workout.recovery[b] - workout.recovery[a]);
 
   const begin = async () => {
-    if (activeId == null) await startWorkout(db, workout.exercises);
+    if (activeId == null) {
+      const id = await startWorkout(db, workout.exercises);
+      if (following) await rememberProgramWorkout(db, id);
+    }
     router.push('/workout');
   };
 
@@ -99,8 +112,20 @@ export default function TodayScreen() {
       <LinearGradient colors={['#FF6A2B', '#E5341B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={{ flexDirection: 'row' }}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.heroEyebrow}>{activeId != null ? 'IN PROGRESS' : 'RECOMMENDED WORKOUT'}</Text>
-            <Text style={styles.heroTitle}>{workout.focus.slice(0, 3).map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
+            <Text style={styles.heroEyebrow}>
+              {activeId != null
+                ? 'IN PROGRESS'
+                : following
+                  ? `${following.program.name.toUpperCase()} · WEEK ${following.week}${following.deload ? ' · DELOAD' : ''}`
+                  : 'RECOMMENDED WORKOUT'}
+            </Text>
+            <Text style={styles.heroTitle}>{following && activeId == null ? following.day.name : workout.focus.slice(0, 3).map((m) => MUSCLE_LABELS[m]).join(', ')}</Text>
+            {following && activeId == null && (
+              <Text style={styles.heroSub}>
+                {following.deload ? 'Lighter on purpose this week. ' : ''}
+                {workout.focus.slice(0, 3).map((m) => MUSCLE_LABELS[m]).join(', ')}
+              </Text>
+            )}
           </View>
           <BodyMap
             height={118}
@@ -168,6 +193,32 @@ export default function TodayScreen() {
           </Pressable>
         );
       })}
+
+      <Pressable
+        onPress={() => router.push('/programs')}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.cardioCard, { marginBottom: space.sm }, pressed && { opacity: 0.8 }]}
+      >
+        <View style={styles.cardioIcon}>
+          <Icon name="calendar" size={22} color={colors.accent} />
+        </View>
+        <View style={{ flex: 1, marginLeft: space.md }}>
+          <Text style={styles.rowTitle}>{data.step ? data.step.program.name : 'Follow a program'}</Text>
+          <Text style={styles.rowMeta}>
+            {!data.step
+              ? 'Full Body, Upper / Lower, Push Pull Legs and more'
+              : data.step.finished
+                ? 'Program complete! Pick your next one.'
+                : `Week ${data.step.week} of ${data.step.program.weeks} · day ${data.step.dayOfWeek} of ${data.step.program.daysPerWeek}`}
+          </Text>
+          {following && (
+            <View style={styles.programTrack}>
+              <View style={[styles.programFill, { width: `${Math.round(following.progress * 100)}%` }]} />
+            </View>
+          )}
+        </View>
+        <Icon name="chevron" size={20} color={colors.textMuted} />
+      </Pressable>
 
       <Pressable
         onPress={() => router.push('/food')}
@@ -262,6 +313,9 @@ const styles = StyleSheet.create({
   content: { padding: space.md, paddingBottom: space.xl * 2 },
   hero: { borderRadius: radius.lg, padding: space.lg },
   heroEyebrow: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700', letterSpacing: 0.8 },
+  heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '600', marginTop: 2 },
+  programTrack: { height: 4, borderRadius: 2, backgroundColor: colors.surfaceRaised, marginTop: space.sm, overflow: 'hidden' },
+  programFill: { height: 4, backgroundColor: colors.accent },
   heroTitle: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', marginTop: 6, lineHeight: 32 },
   heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
   heroStat: {
