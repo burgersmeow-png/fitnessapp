@@ -82,7 +82,10 @@ export async function linkWithMyCode(db: SQLiteDatabase, url: string): Promise<s
  */
 export async function creditFromLink(db: SQLiteDatabase, raw: string | null | undefined): Promise<string | null> {
   const code = raw ? normalizeCode(raw) : null;
-  if (!code || !SERVER_URL || (await loadCreator(db))) return null;
+  if (!code || !SERVER_URL) return null;
+  // Already credited: name the creator only if it's the same one.
+  const mine = await loadCreator(db);
+  if (mine) return mine.code === code ? mine.creatorName : null;
   try {
     const found = await checkCode(code);
     await applyCode(db, found);
