@@ -33,7 +33,7 @@ import type { FollowedPlan } from '../../lib/planLink';
 import { planFromLink } from '../../lib/workoutLink';
 import { loadChallenge } from '../../services/challenge';
 import { challengeProgress, type ChallengeProgress, type JoinedChallenge } from '../../lib/challenge';
-import { syncReminders } from '../../services/reminders';
+import { syncRecapNudge, syncReminders } from '../../services/reminders';
 import { syncStravaIfDue } from '../../services/strava';
 
 interface TodayData {
@@ -77,6 +77,7 @@ export default function TodayScreen() {
     const badges = await checkBadges(db, settings.weeklyGoal);
     // Re-plan reminders whenever Today opens, so they reflect what's been done.
     syncReminders(db, settings);
+    syncRecapNudge(db);
     // Leave out a different slice of the library each time the user asks for another plan.
     const rotated = seed === 0 ? exercises : exercises.filter((_, i) => (i + seed) % 4 !== 0);
     // A program decides what to train today; recovery and progression still pick the lifts.

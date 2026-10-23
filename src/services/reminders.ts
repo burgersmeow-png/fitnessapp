@@ -1,7 +1,9 @@
 import * as Notifications from 'expo-notifications';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
+import { loadRecord, saveRecord } from '../lib/db';
 import { dayKey, goalLine, reminderTimes, weekProgress } from '../lib/habits';
+import { recapNudge } from '../lib/recap';
 import { startOfWeek } from '../lib/social';
 import type { Settings } from '../lib/types';
 import { loadSessionDates } from './habits';
@@ -57,5 +59,38 @@ export async function syncReminders(db: SQLiteDatabase, settings: Settings): Pro
     }
   } catch {
     // Reminders are a nice-to-have; nothing else depends on them.
+  }
+}
+
+const RECAP_ID = 'week-recap';
+const RECAP_OFF = 'recap-nudge-off';
+
+export async function recapNudgeOn(db: SQLiteDatabase): Promise<boolean> {
+  return !(await loadRecord<boolean>(db, RECAP_OFF));
+}
+
+export async function setRecapNudge(db: SQLiteDatabase, on: boolean): Promise<void> {
+  await saveRecord(db, RECAP_OFF, on ? null : true);
+  await syncRecapNudge(db);
+}
+
+/**
+ * Schedules this Sunday's "your week recap is ready" reminder, which opens the week card.
+ * Never asks for permission itself: it only goes out once notifications are already allowed.
+ */
+export async function syncRecapNudge(db: SQLiteDatabase): Promise<void> {
+  if (!remindersSupported) return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(RECAP_ID).catch(() => {});
+    if (!(await recapNudgeOn(db)) || !(await Notifications.getPermissionsAsync()).granted) return;
+    const nudge = recapNudge(new Date(), await loadSessionDates(db));
+    if (!nudge) return;
+    await Notifications.scheduleNotificationAsync({
+      identifier: RECAP_ID,
+      content: { title: 'Your week in LiftLab', body: nudge.body, sound: true, data: { path: '/history', params: { share: 'week' } } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nudge.at },
+    });
+  } catch {
+    // A missed recap reminder costs nothing.
   }
 }

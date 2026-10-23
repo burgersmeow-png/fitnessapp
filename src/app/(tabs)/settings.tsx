@@ -2,7 +2,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StravaCard } from '../../components/StravaCard';
-import { allowReminders, remindersSupported, syncReminders } from '../../services/reminders';
+import { allowReminders, recapNudgeOn, remindersSupported, setRecapNudge, syncReminders } from '../../services/reminders';
 import { stravaEnabled } from '../../services/strava';
 import { socialConfigured } from '../../services/supabase';
 import { Button, Chip, SectionLabel, Loading } from '../../components/ui';
@@ -47,6 +47,10 @@ export default function SettingsScreen() {
   const [weightText, setWeightText] = useState('');
   const [notifyBlocked, setNotifyBlocked] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
+  const [recapOn, setRecapOn] = useState(true);
+  useEffect(() => {
+    recapNudgeOn(db).then(setRecapOn).catch(() => {});
+  }, [db]);
   useEffect(() => {
     if (settings) setWeightText(settings.bodyWeightKg ? String(Math.round(fromKg(settings.bodyWeightKg))) : '');
   }, [settings]);
@@ -59,6 +63,16 @@ export default function SettingsScreen() {
     reload();
     if ('reminderDays' in patch || 'reminderMinutes' in patch || 'weeklyGoal' in patch) syncReminders(db, next);
   };
+  const toggleRecap = async () => {
+    const on = !recapOn;
+    if (on && !(await allowReminders())) {
+      setNotifyBlocked(true);
+      return;
+    }
+    setRecapOn(on);
+    await setRecapNudge(db, on);
+  };
+
   const toggleReminderDay = async (day: number) => {
     const has = settings.reminderDays.includes(day);
     // Ask for permission the first time a day is turned on, not on launch.
@@ -124,6 +138,10 @@ export default function SettingsScreen() {
                 ? 'Pick the days you plan to train and we’ll nudge you. Off for now.'
                 : 'No reminder on a day you’ve already trained, or once this week’s goal is hit.'}
           </Text>
+          <View style={[styles.wrap, { marginTop: space.md }]}>
+            <Chip label="Sunday recap" selected={recapOn} onPress={toggleRecap} />
+          </View>
+          <Text style={styles.note}>Sunday at 7pm, a nudge to share your week’s story card. Only in weeks you trained, and only once notifications are allowed.</Text>
         </>
       ) : (
         <Text style={[styles.note, { marginTop: 0 }]}>Reminders work in the app on your phone.</Text>

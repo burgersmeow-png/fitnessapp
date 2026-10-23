@@ -136,3 +136,20 @@ function build(r: RecapInput, p: Period): CardContent | null {
     footer: bestPr.size > 0 ? `${bestPr.size} new PR${bestPr.size > 1 ? 's' : ''} · Tracked with LiftLab` : 'Planned and tracked with LiftLab',
   };
 }
+
+/** Sunday at this hour is when the week recap reminder goes out. */
+export const RECAP_NUDGE_HOUR = 19;
+
+/**
+ * The Sunday-evening "your week recap is ready" reminder, or null when this week has no
+ * training yet or Sunday evening has already passed.
+ */
+export function recapNudge(now: Date, trainedOn: string[]): { at: Date; body: string } | null {
+  const monday = startOfWeek(now);
+  const at = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, RECAP_NUDGE_HOUR);
+  if (now.getTime() >= at.getTime()) return null;
+  const n = trainedOn.filter((t) => Date.parse(t) >= monday.getTime() && Date.parse(t) < at.getTime()).length;
+  if (n === 0) return null;
+  const times = n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`;
+  return { at, body: `You trained ${times} this week. Your recap card is ready to share.` };
+}

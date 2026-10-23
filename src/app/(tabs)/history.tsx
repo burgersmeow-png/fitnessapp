@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '../../components/Icon';
 import { ShareCardSheet } from '../../components/ShareCardSheet';
@@ -21,12 +21,20 @@ type Entry = { kind: 'lift'; at: string; workout: WorkoutSummary } | { kind: 'ca
 
 export default function HistoryScreen() {
   const db = useSQLiteContext();
+  const params = useLocalSearchParams<{ share?: string }>();
   const [card, setCard] = useState<{ content: CardContent; week: boolean } | null>(null);
   const [data] = useFocusData(async () => {
     const settings = await loadSettings(db);
     const [workouts, cardio, badges] = await Promise.all([loadWorkouts(db), loadCardio(db), checkBadges(db, settings.weeklyGoal)]);
     return { workouts, cardio, settings, badges: Object.keys(badges.earned).length };
   });
+  const shareRef = useRef<(which: 'week' | 'month') => void>(undefined);
+  // The Sunday recap reminder opens History with the week card up.
+  useEffect(() => {
+    if (params.share !== 'week' || !data) return;
+    router.setParams({ share: undefined });
+    shareRef.current?.('week');
+  }, [params.share, data]);
   if (!data) return <Loading />;
   const { workouts, cardio, settings } = data;
   const entries: Entry[] = [
@@ -51,6 +59,7 @@ export default function HistoryScreen() {
     const content = which === 'week' ? weekRecapContent({ ...r, week }) : recapContent({ ...r, month });
     if (content) setCard({ content, week: which === 'week' });
   };
+  shareRef.current = share;
 
   return (
     <>
