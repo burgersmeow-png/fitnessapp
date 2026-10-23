@@ -1,6 +1,6 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StravaCard } from '../../components/StravaCard';
 import { allowReminders, recapNudgeOn, remindersSupported, setRecapNudge, syncReminders } from '../../services/reminders';
 import { stravaEnabled } from '../../services/strava';
@@ -16,6 +16,8 @@ import { dailyTargets } from '../../lib/nutrition';
 import { colors, radius, space } from '../../lib/theme';
 import { ALL_EQUIPMENT, type Goal, type Settings } from '../../lib/types';
 import { useFocusData } from '../../lib/useData';
+import { activeGym, addGym, MAX_GYMS, removeGym, renameGym, switchGym, withEquipment, GYM_NAME_MAX, type Gyms } from '../../lib/gyms';
+import { loadGyms, saveGyms } from '../../services/gyms';
 
 const GOALS: { value: Goal; label: string }[] = [
   { value: 'strength', label: 'Strength' },
@@ -48,6 +50,14 @@ export default function SettingsScreen() {
   const [notifyBlocked, setNotifyBlocked] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
   const [recapOn, setRecapOn] = useState(true);
+  const [gyms, setGyms] = useState<Gyms | null>(null);
+  const [gymName, setGymName] = useState('');
+  useEffect(() => {
+    if (settings) loadGyms(db).then(setGyms).catch(() => {});
+  }, [db, settings]);
+  useEffect(() => {
+    if (gyms) setGymName(activeGym(gyms).name);
+  }, [gyms?.active]);
   useEffect(() => {
     recapNudgeOn(db).then(setRecapOn).catch(() => {});
   }, [db]);
@@ -83,11 +93,19 @@ export default function SettingsScreen() {
     }
     update({ reminderDays: has ? settings.reminderDays.filter((d) => d !== day) : [...settings.reminderDays, day] });
   };
+  const changeGyms = async (next: Gyms) => {
+    setGyms(next);
+    await saveGyms(db, next);
+    reload();
+  };
   const toggleEquipment = (e: (typeof ALL_EQUIPMENT)[number]) => {
     const has = settings.equipment.includes(e);
     const next = has ? settings.equipment.filter((x) => x !== e) : [...settings.equipment, e];
-    if (next.length > 0) update({ equipment: next });
+    if (next.length === 0) return;
+    if (gyms) changeGyms(withEquipment(gyms, next));
+    else update({ equipment: next });
   };
+  const gym = gyms && activeGym(gyms);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: space.md, paddingBottom: space.xl }}>
@@ -103,12 +121,40 @@ export default function SettingsScreen() {
           <Chip key={m} label={`${m} min`} selected={settings.minutes === m} onPress={() => update({ minutes: m })} />
         ))}
       </View>
-      <SectionLabel>Equipment you have</SectionLabel>
+      <SectionLabel>Where you train</SectionLabel>
+      {gyms && gym && (
+        <>
+          <View style={styles.wrap}>
+            {gyms.list.map((g) => (
+              <Chip key={g.id} label={g.name} selected={g.id === gyms.active} onPress={() => changeGyms(switchGym(gyms, g.id))} />
+            ))}
+            {gyms.list.length < MAX_GYMS && <Chip label="+ Add a place" selected={false} onPress={() => changeGyms(addGym(gyms) ?? gyms)} />}
+          </View>
+          <View style={[styles.weightRow, { marginTop: space.sm }]}>
+            <TextInput
+              style={[styles.weightInput, styles.nameInput]}
+              value={gymName}
+              onChangeText={setGymName}
+              onBlur={() => changeGyms(renameGym(gyms, gym.id, gymName))}
+              maxLength={GYM_NAME_MAX}
+              accessibilityLabel="Name of this place"
+              maxFontSizeMultiplier={1.4}
+            />
+            {gyms.list.length > 1 && (
+              <Pressable onPress={() => changeGyms(removeGym(gyms, gym.id))} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Remove ${gym.name}`}>
+                <Text style={styles.remove}>Remove</Text>
+              </Pressable>
+            )}
+          </View>
+        </>
+      )}
+      <SectionLabel>{gym && gyms!.list.length > 1 ? `Equipment at ${gym.name}` : 'Equipment you have'}</SectionLabel>
       <View style={styles.wrap}>
         {ALL_EQUIPMENT.map((e) => (
           <Chip key={e} label={e[0].toUpperCase() + e.slice(1)} selected={settings.equipment.includes(e)} onPress={() => toggleEquipment(e)} />
         ))}
       </View>
+      {gyms?.list.length === 1 && <Text style={styles.note}>Train in more than one place? Add it, and switch from Today. Workouts only use what’s there.</Text>}
       <SectionLabel>Weekly goal</SectionLabel>
       <View style={styles.wrap}>
         {GOAL_DAYS.map((n) => (
@@ -236,4 +282,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   unit: { color: colors.textMuted, fontSize: 17, fontWeight: '600' },
+  nameInput: { flex: 1, width: undefined, fontSize: 17, textAlign: 'left', paddingHorizontal: space.md },
+  remove: { color: colors.danger, fontSize: 15, fontWeight: '700', paddingHorizontal: space.sm },
 });
